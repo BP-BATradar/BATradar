@@ -1,4 +1,4 @@
-# BATradar
+# BATradar: Acoustic Drone Localization Engine
 
 This repository contains the implementation of a Bachelor's project focused on detecting drones using audio signals. The project explores methods for identifying drone presence from recorded sound, trains detection models, and provides scripts and datasets for reproducing the experiments.
 
