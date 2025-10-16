@@ -14,4 +14,4 @@ BATradar was implemented as part of a Bachelor's thesis. The primary goal is to 
 
 ## Contact
 
-If you have questions about the project or the Bachelor's thesis, please do not hesitate to contact us: lorisfabian.klindworth@student.unisg.ch, colinwai-loen.berendt@student.unisg.ch
+If you have questions about the project, please do not hesitate to contact us: lorisfabian.klindworth@student.unisg.ch, colinwai-loen.berendt@student.unisg.ch
