@@ -12,6 +12,9 @@ BATradar was implemented as part of a Bachelor's thesis. The primary goal is to 
 
 ## Usage
 
+## References
+Inspired by https://github.com/jonaslanzlinger/IMP/blob/main/pysoundlocalization/localization/gcc_phat.py
+
 ## Contact
 
 If you have questions about the project, please do not hesitate to contact us: lorisfabian.klindworth@student.unisg.ch, colinwai-loen.berendt@student.unisg.ch
