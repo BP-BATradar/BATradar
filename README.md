@@ -13,7 +13,7 @@ BATradar was implemented as part of a Bachelor's thesis. The primary goal is to 
 ## Usage
 
 ## References
-Inspired by https://github.com/jonaslanzlinger/IMP/blob/main/pysoundlocalization/localization/gcc_phat.py
+Inspired by https://github.com/jonaslanzlinger/IMP
 
 ## Contact
 
