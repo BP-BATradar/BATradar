@@ -1,0 +1,119 @@
+from core.Microphone import Microphone
+
+
+class Tdoa4:
+    def __init__(self, mic1: Microphone, mic2: Microphone, mic3: Microphone, mic4: Microphone, tdoa: float) -> None:
+        """
+        Create a new Tdoa4 instance.
+
+        Args:
+            mic1 (Microphone): The first microphone in the array.
+            mic2 (Microphone): The second microphone in the array.
+            mic3 (Microphone): The third microphone in the array.
+            mic4 (Microphone): The fourth microphone in the array.
+            tdoa (float): The time difference of arrival between the two microphones.
+        """
+        self.__mic1 = mic1
+        self.__mic2 = mic2
+        self.__mic3 = mic3
+        self.__mic4 = mic4
+        self.__tdoa = tdoa
+
+    def __str__(self):
+        """
+        Return a string representation of the Tdoa4 instance.
+
+        Returns:
+            str: A string representation of the Tdoa4 instance.
+        """
+        return f"(Tdoa4: mic1={self.__mic1.get_name()}, mic2={self.__mic2.get_name()}, mic3={self.__mic3.get_name()}, mic4={self.__mic4.get_name()}, tdoa={self.__tdoa:.6f})"
+
+    def __repr__(self):
+        """
+        Return a string representation of the Tdoa4 instance.
+
+        Returns:
+            str: A string representation of the Tdoa4 instance.
+        """
+        return str(self)
+
+    def get_mic1(self) -> Microphone:
+        """
+        Return:
+            Microphone: The first microphone in the pair.
+        """
+        return self.__mic1
+
+    def set_mic1(self, mic1: Microphone) -> None:
+        """
+        Set the first microphone in the pair.
+
+        Args:
+            mic1 (Microphone): The first microphone in the pair.
+        """
+        self.__mic1 = mic1
+
+    def get_mic2(self) -> Microphone:
+        """
+        Return:
+            Microphone: The second microphone in the pair.
+        """
+        return self.__mic2
+
+    def set_mic2(self, mic2: Microphone) -> None:
+        """
+        Set the second microphone in the pair.
+
+        Args:
+            mic2 (Microphone): The second microphone in the pair.
+        """
+        self.__mic2 = mic2
+
+    def get_mic3(self) -> Microphone:
+        """
+        Return:
+            Microphone: The third microphone in the pair.
+        """
+        return self.__mic3
+
+    def set_mic3(self, mic3: Microphone) -> None:
+        """
+        Set the third microphone in the pair.
+
+        Args:
+            mic3 (Microphone): The third microphone in the pair.
+        """
+        self.__mic3 = mic3
+
+    def get_mic4(self) -> Microphone:
+        """
+        Return:
+            Microphone: The fourth microphone in the pair.
+        """
+        return self.__mic4
+
+    def set_mic4(self, mic4: Microphone) -> None:
+        """
+        Set the fourth microphone in the pair.
+
+        Args:
+            mic4 (Microphone): The fourth microphone in the pair.
+        """
+        self.__mic4 = mic4
+        return self.__mic4
+    
+    def get_tdoa(self) -> float:
+        """
+        Return:
+            float: The time difference of arrival between the two microphones.
+        """
+        return self.__tdoa
+
+    def set_tdoa(self, tdoa: float) -> None:
+        """
+        Set the time difference of arrival between the two microphones.
+
+        Args:
+            tdoa (float): The time difference of arrival between the two microphones.
+        """
+        self.__tdoa = tdoa

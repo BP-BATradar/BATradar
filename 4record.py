@@ -2,6 +2,7 @@ import sounddevice as sd
 from scipy.io.wavfile import write
 from datetime import datetime
 import numpy as np
+import os
 
 SAMPLE_RATE = 44100
 
@@ -69,7 +70,15 @@ def record_multiple_devices(device_name_pairs, duration_seconds):
         if data.ndim == 1:
             data = data.reshape(-1, 1)
 
-        filename = f"output_{end_timestamp.strftime(f'{mic_name}_%Y-%m-%d_%H-%M-%S_%f')}.wav"
+        # Directory of the current script
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+
+        # Create output directory if it doesn't exist
+        output_dir = os.path.join(script_dir, "output")
+        os.makedirs(output_dir, exist_ok=True)
+
+        #Save with timestamp and microphone name
+        filename = f"{output_dir}/output_{end_timestamp.strftime(f'{mic_name}_%Y-%m-%d_%H-%M-%S_%f')}.wav"
         write(filename, SAMPLE_RATE, data)
         print(f"Saved: {filename} (device {device_id}, samples {len(data)})")
 
