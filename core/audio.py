@@ -37,7 +37,7 @@ class Audio:
         print(f"Audio object created from {filepath}")
 
     @classmethod
-    def create_from_signal(cls, audio_signal: np.ndarray, sample_rate: int) -> "Audio":
+    def create_from_signal(cls, audio_signal: np.ndarray, sample_rate: int = 16000) -> "Audio":
         """
         Create an Audio object from an audio signal and sample rate.
 

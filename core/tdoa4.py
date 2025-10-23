@@ -1,4 +1,4 @@
-from core.Microphone import Microphone
+from core.microphone import Microphone
 
 
 class Tdoa4:
