@@ -1,7 +1,8 @@
 from pathlib import Path
 from core.audio import Audio
 from core.microphone import Microphone
-from tdoa_calc import get_all_tdoa_of_chunk_index_by_gcc_phat, approximate_sound_source
+from tdoa_calc import get_all_tdoa_of_chunk_index_by_gcc_phat
+from localization.multilateration import multilaterate_by_tdoa_pairs
 
 #Mic names and their corresponding WAV files
 outdir = Path(__file__).parent / "output"
@@ -10,7 +11,7 @@ mic_names = ["bl","tl","br","tr"]
 #Assign wav files to mic names
 mic_files = {}
 for name in mic_names:
-    matches = sorted(outdir.glob(f"{name}.wav")) 
+    matches = sorted(outdir.glob(f"{name}_sync.wav")) 
     if not matches:
         raise FileNotFoundError(f"No file for mic '{name}' in {outdir}")
     mic_files[name] = matches[-1]  # newest
@@ -31,5 +32,5 @@ m4.set_audio(Audio(filepath=str(mic_files["tr"])))
 tdoa_results = get_all_tdoa_of_chunk_index_by_gcc_phat(m1, m2, m3, m4, chunk_index=0, debug=True)
 
 # 5) Multilateration
-xs, ys = approximate_sound_source(tdoa_results)
+xs, ys = multilaterate_by_tdoa_pairs(tdoa_results)
 print("Estimated source position:", xs, ys)

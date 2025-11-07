@@ -53,7 +53,7 @@ def multilaterate_by_tdoa_pairs(
     # Initial guess (e.g., center of the mic positions or any reasonable point)
     # Or any reasonable starting point in your coordinate system
     initial_guess = [0, 0]
-    for mic1, mic2, d in tdoa_distances:
+    for mic1, mic2 in tdoa_distances:
         x1, y1 = mic1.get_position()
         x2, y2 = mic2.get_position()
         initial_guess[0] += (x1 + x2) / 2
