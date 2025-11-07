@@ -1,4 +1,4 @@
-from core.tdoa4 import Tdoa4
+from core.tdoaPair import Tdoa4
 from core.doa4 import Doa4
 import math
 import numpy as np

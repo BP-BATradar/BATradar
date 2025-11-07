@@ -78,7 +78,7 @@ def record_multiple_devices(device_name_pairs, duration_seconds):
         os.makedirs(output_dir, exist_ok=True)
 
         #Save with timestamp and microphone name
-        filename = f"{output_dir}/output_{end_timestamp.strftime(f'{mic_name}_%Y-%m-%d_%H-%M-%S_%f')}.wav"
+        filename = f"{output_dir}/{mic_name}.wav"
         write(filename, SAMPLE_RATE, data)
         print(f"Saved: {filename} (device {device_id}, samples {len(data)})")
 
