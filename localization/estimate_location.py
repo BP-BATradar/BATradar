@@ -1,7 +1,7 @@
 from pathlib import Path
 from core.audio import Audio
 from core.microphone import Microphone
-from tdoa_calc import get_all_tdoa_of_chunk_index_by_gcc_phat
+from localization.tdoa_calc import get_all_tdoa_of_chunk_index_by_gcc_phat
 from localization.multilateration import multilaterate_by_tdoa_pairs
 
 #Mic names and their corresponding WAV files

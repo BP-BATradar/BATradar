@@ -9,7 +9,7 @@ from typing import List, Optional
 import numpy as np
 import sounddevice as sd
 
-from config import SAMPLE_RATE, CHUNK_DURATION
+from core.config import SAMPLE_RATE, CHUNK_DURATION
 
 
 class MultiDeviceRecorder:

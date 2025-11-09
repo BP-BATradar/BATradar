@@ -6,8 +6,8 @@ import sounddevice as sd
 from scipy.io.wavfile import write
 from datetime import datetime
 import numpy as np
-from config import SAMPLE_RATE, CHUNK_DURATION
-from multi_device_recorder import MultiDeviceRecorder
+from core.config import SAMPLE_RATE, CHUNK_DURATION
+from recording.multi_device_recorder import MultiDeviceRecorder
 
 def list_microphones():
     """Show all microphones available on your system."""
