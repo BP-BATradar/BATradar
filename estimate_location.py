@@ -11,16 +11,16 @@ mic_names = ["bl","tl","br","tr"]
 #Assign wav files to mic names
 mic_files = {}
 for name in mic_names:
-    matches = sorted(outdir.glob(f"{name}_sync.wav")) 
+    matches = sorted(outdir.glob(f"{name}.wav")) 
     if not matches:
         raise FileNotFoundError(f"No file for mic '{name}' in {outdir}")
     mic_files[name] = matches[-1]  # newest
 
 # 2) Erzeuge Microphone-Instanzen mit bekannten Positionen (Meter)
 m1 = Microphone(x=0.0, y=0.0, name="bl")
-m2 = Microphone(x=0.0, y=1.0, name="tl")
-m3 = Microphone(x=1.0, y=0.0, name="br")
-m4 = Microphone(x=1.0, y=1.0, name="tr")
+m2 = Microphone(x=0.0, y=2.0, name="tl")
+m3 = Microphone(x=2.0, y=0.0, name="br")
+m4 = Microphone(x=2.0, y=2.0, name="tr")
 
 # 3) Lade Audios und setze sie
 m1.set_audio(Audio(filepath=str(mic_files["bl"])))

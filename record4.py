@@ -1,273 +1,168 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import sounddevice as sd
 from scipy.io.wavfile import write
 from datetime import datetime
 import numpy as np
-import os
-import struct
-from scipy import signal
-from scipy.io import wavfile
-
-SAMPLE_RATE = 44100
-
+from config import SAMPLE_RATE, CHUNK_DURATION
+from multi_device_recorder import MultiDeviceRecorder
 
 def list_microphones():
-    print("Available audio devices (indices shown by library):")
-    print(sd.query_devices())
+    """Show all microphones available on your system."""
+    print("=" * 70)
+    print("Available microphones:")
+    devices = sd.query_devices()
+    for i, device in enumerate(devices):
+        if device['max_input_channels'] > 0:  # Only show devices that can record
+            print(f"[{i}] {device['name']} - Channels: {device['max_input_channels']}")
+    print("=" * 70)
 
-
-def record_multiple_devices(device_name_pairs, duration_seconds):
-    """
-    Record simultaneously from multiple devices.
-
-    device_name_pairs: list of tuples (device_id:int, mic_name:str)
-    duration_seconds: int|float total duration in seconds
-    """
-    buffers_per_device = []  # list of lists, each inner list accumulates callback blocks
-    streams = []
-
-    def make_callback(buffer_list):
-        def _callback(indata, frames, time, status):
-            if status:
-                # Non-fatal stream status (XRuns, etc.) are printed for visibility
-                print(f"Stream status: {status}")
-            # Append a copy to avoid referencing the same memory
-            buffer_list.append(indata.copy())
-        return _callback
-
-    # Create one InputStream per device
-    for (device_id, _mic_name) in device_name_pairs:
-        buf = []
-        buffers_per_device.append(buf)
-        stream = sd.InputStream(
-            device=device_id,
-            channels=1,
-            samplerate=SAMPLE_RATE,
-            dtype='float32',
-            blocksize=1024,
-            callback=make_callback(buf),
-        )
-        streams.append(stream)
-
-    # Start all streams as close together as possible
-    start_timestamp = datetime.now()
-    for s in streams:
-        s.start()
-
-    # Let them run for the specified duration
-    sd.sleep(int(duration_seconds * 1000))
-
-    # Stop and close all streams
-    for s in streams:
-        s.stop()
-        s.close()
-    end_timestamp = datetime.now()
-
-    # Write out files for each device
-    for (idx, (device_id, mic_name)) in enumerate(device_name_pairs):
-        if buffers_per_device[idx]:
-            data = np.concatenate(buffers_per_device[idx], axis=0)
-        else:
-            data = np.empty((0, 1), dtype=np.float32)
-
-        # Ensure correct shape for mono
-        if data.ndim == 1:
-            data = data.reshape(-1, 1)
-
-        # Directory of the current script
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-
-        # Create output directory if it doesn't exist
-        output_dir = os.path.join(script_dir, "output")
-        os.makedirs(output_dir, exist_ok=True)
-
-        # Save with timestamp and microphone name (convert floats to int16 for compatibility)
-        filename = f"{output_dir}/{mic_name}_sync.wav"
-        # convert float32 [-1,1] to int16 PCM
-        if data.dtype == np.float32 or data.dtype == np.float64:
-            outdata = float_to_int16(data)
-        else:
-            outdata = data
-        write(filename, SAMPLE_RATE, outdata)
-        print(f"Saved: {filename} (device {device_id}, samples {len(data)})")
-
-    print(f"Total time recorded: {end_timestamp - start_timestamp}")
-
-
-def sync_and_write(infiles, outdir, prepad_ms=50, threshold=95, remove_ms=0):
-    """Align multiple recordings so the clap peak appears at prepad_ms.
-
-    Steps:
-    - find global peak (max absolute sample) in each file (peak index)
-    - compute desired peak index = prepad_ms in samples
-    - trim or pad front of each file so its peak moves to desired index
-    - optionally remove remove_ms milliseconds starting at the desired peak
-    - pad ends so all outputs have same length
-    """
-    records = []
-    sr_set = set()
-    for infile in infiles:
-        samples, sr = read_wav_manual(infile)
-        # determine clap as the global peak (max absolute across channels)
-        if samples.ndim > 1:
-            abs_env = np.max(np.abs(samples), axis=1)
-        else:
-            abs_env = np.abs(samples)
-        peak_idx = int(np.argmax(abs_env))
-        records.append({'infile': infile, 'samples': samples, 'sr': sr, 'peak': peak_idx})
-        sr_set.add(sr)
-
-    if len(sr_set) != 1:
-        print("Warning: input files have different sample rates. Results may be incorrect.")
-
-    sr = records[0]['sr']
-    desired_peak = int((prepad_ms / 1000.0) * sr)
-
-    aligned = []
-    for rec in records:
-        samples = rec['samples']
-        peak = rec['peak']
-        infile = rec['infile']
-
-        shift = peak - desired_peak
-        if shift >= 0:
-            # trim beginning by shift samples so peak moves to desired_peak
-            out = samples[shift:]
-        else:
-            # pad front with zeros
-            pad_len = -shift
-            if samples.ndim == 1:
-                pad = np.zeros((pad_len,), dtype=samples.dtype)
-            else:
-                pad = np.zeros((pad_len, samples.shape[1]), dtype=samples.dtype)
-            out = np.concatenate([pad, samples], axis=0)
-
-        aligned.append({'infile': infile, 'out': out})
-
-    # Optionally remove the clap region starting at desired_peak in every file
-    if remove_ms and remove_ms > 0:
-        remove_samples = int((remove_ms / 1000.0) * sr)
-        for a in aligned:
-            out = a['out']
-            event_idx = desired_peak
-            remove_end = min(out.shape[0], event_idx + remove_samples)
-            if out.ndim == 1:
-                out = np.concatenate([out[:event_idx], out[remove_end:]], axis=0)
-            else:
-                out = np.concatenate([out[:event_idx, :], out[remove_end:, :]], axis=0)
-            a['out'] = out
-
-    # Make all outputs same length by padding ends to the max length
-    max_len = max(a['out'].shape[0] for a in aligned)
-    outputs = []
-    for a in aligned:
-        out = a['out']
-        if out.shape[0] < max_len:
-            if out.ndim == 1:
-                pad_end = np.zeros((max_len - out.shape[0],), dtype=out.dtype)
-            else:
-                pad_end = np.zeros((max_len - out.shape[0], out.shape[1]), dtype=out.dtype)
-            out = np.concatenate([out, pad_end], axis=0)
-
-        base = os.path.basename(a['infile'])
-        name, ext = os.path.splitext(base)
-        outname = os.path.join(outdir, f"{name}_sync{ext}")
-
-        if out.dtype == np.float32 or out.dtype == np.float64:
-            outdata = float_to_int16(out)
-        else:
-            outdata = out
-
-        wavfile.write(outname, sr, outdata)
-        outputs.append((outname, out.shape[0]))
-        print(f"Wrote: {outname}  (desired_peak {desired_peak})")
-
-    return outputs
-
-def float_to_int16(x):
-    clipped = np.clip(x, -1.0, 1.0)
-    return (clipped * 32767).astype(np.int16)
-
-def read_wav_manual(filename):
-    """Read WAV file similar to `test_tdoa.py` handling float32 and int16.
-    Returns (samples, sample_rate). Channels preserved.
-    """
-    with open(filename, 'rb') as f:
-        f.read(4)  # RIFF
-        f.read(4)  # file size
-        f.read(4)  # WAVE
-        audio_format = None
-        channels = 1
-        sample_rate = None
-        bits_per_sample = None
-        data = None
-
-        while True:
-            chunk_id = f.read(4)
-            if not chunk_id:
-                break
-            chunk_size = struct.unpack('<I', f.read(4))[0]
-
-            if chunk_id == b'fmt ':
-                fmt_data = f.read(chunk_size)
-                audio_format = struct.unpack('<H', fmt_data[0:2])[0]
-                channels = struct.unpack('<H', fmt_data[2:4])[0]
-                sample_rate = struct.unpack('<I', fmt_data[4:8])[0]
-                bits_per_sample = struct.unpack('<H', fmt_data[14:16])[0]
-            elif chunk_id == b'data':
-                data = f.read(chunk_size)
-                break
-            else:
-                f.read(chunk_size)
-
-        if data is None:
-            raise RuntimeError(f"No data chunk found in {filename}")
-
-        if audio_format == 3 and bits_per_sample == 32:
-            samples = np.frombuffer(data, dtype=np.float32)
-        elif audio_format == 1 and bits_per_sample == 16:
-            samples = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
-        else:
-            # Fallback to scipy read
-            sr, s = wavfile.read(filename)
-            if s.dtype == np.int16:
-                s = s.astype(np.float32) / 32768.0
-            return s, sr
-
-        if channels > 1:
-            samples = samples.reshape(-1, channels)
-
-        return samples, sample_rate
-
-if __name__ == "__main__":
-    # Show devices so the user can pick indices
+def select_microphones():
+    """Let user pick which 4 microphones to use for recording."""
     list_microphones()
 
-    # Collect 4 devices and their names
-    device_name_pairs = []
-    for i in range(1, 5):
-        name = str(input(f"Enter a name for microphone #{i}: ").strip())
-        device_id = int(input(f"Enter the device ID to use for '{name}': ").strip())
-        device_name_pairs.append((device_id, name))
+    mic_indices = []
+    mic_names = []
 
-    # Shared duration
-    duration = float(input("Enter how many seconds you want to record: ").strip())
+    print("\nPlease select 4 microphones by entering their device numbers:")
+    mic_positions = ['bottom_left', 'bottom_right', 'top_left', 'top_right']
 
-    # Perform simultaneous recording
-    record_multiple_devices(device_name_pairs, duration)
+    for position in mic_positions:
+        while True:
+            try:
+                idx = int(input(f"Enter device number for {position} microphone: "))
+                device = sd.query_devices(idx)
+                if device['max_input_channels'] == 0:
+                    print(f"Error: Device {idx} can't record audio. Please choose another.")
+                    continue
+                mic_indices.append(idx)
+                mic_names.append(device['name'])
+                break
+            except (ValueError, sd.PortAudioError):
+                print("Invalid device number. Please try again.")
 
-    # Build full paths to the recorded files and sync them
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    output_dir = os.path.join(script_dir, "output")
-    # recorded filenames use the pattern {mic_name}_sync.wav
-    infiles = [os.path.join(output_dir, f"{name}_sync.wav") for (_id, name) in device_name_pairs]
+    return mic_indices, mic_names
 
-    # verify files exist (print warnings if not)
-    missing = [p for p in infiles if not os.path.exists(p)]
-    if missing:
-        print("Warning: some recorded files are missing:")
-        for m in missing:
-            print("  ", m)
-    else:
-        sync_and_write(infiles, output_dir)
+def record_synchronized(mic_indices, duration=CHUNK_DURATION, sample_rate=SAMPLE_RATE, verbose=True):
+    """
+    Record a short audio clip from 4 separate microphones with open streams.
 
+    This keeps each microphone stream running continuously to avoid extra jitter.
+    Hardware clocks are not forced into alignment; any fixed offset between
+    microphones remains in the returned data so it can be corrected with bias
+    calibration later.
+    """
+    if len(mic_indices) != 4:
+        raise ValueError("Exactly 4 microphones are required")
 
+    num_samples = int(duration * sample_rate)
+
+    if verbose:
+        print(f"\n" + "="*70)
+        print(f"MULTI-DEVICE RECORDING (no shared clock)")
+        print(f"="*70)
+        print(f"Duration: {duration} seconds")
+        print(f"Sample rate: {sample_rate} Hz")
+        print(f"Target samples per mic: {num_samples}")
+        print(f"Recording from {len(mic_indices)} separate devices...")
+
+    # Set up the recorder that handles all the complex synchronization
+    recorder = MultiDeviceRecorder(
+        mic_indices=mic_indices,
+        sample_rate=sample_rate,
+        chunk_duration=duration,
+        blocksize=256,
+    )
+    recorder.start()
+    try:
+        block = recorder.read_chunk(timeout=5.0)  # shape: (num_samples, 4)
+    finally:
+        recorder.stop()
+
+    # Make sure we have exactly the right amount of audio
+    if block.shape[0] > num_samples:
+        block = block[:num_samples, :]  # Trim if too long
+    elif block.shape[0] < num_samples:
+        # Pad with silence if too short
+        pad = np.zeros((num_samples - block.shape[0], block.shape[1]), dtype=block.dtype)
+        block = np.vstack([block, pad])
+
+    # Split the synchronized audio back into individual microphone recordings
+    aligned_recordings = [block[:, i].copy() for i in range(4)]
+
+    return aligned_recordings
+
+def save_recordings(recordings, mic_names, sample_rate=SAMPLE_RATE):
+    """
+    Save each microphone's audio to its own WAV file.
+
+    Creates a timestamped folder and saves each recording with a descriptive name
+    showing which position and device it came from.
+
+    Args:
+        recordings: List of 4 numpy arrays with the audio data
+        mic_names: List of 4 microphone device names
+        sample_rate: Audio sample rate in Hz
+    """
+    # Create unique timestamp for this recording session
+    output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
+
+    # Make sure the recordings folder exists
+    os.makedirs(output_dir, exist_ok=True)
+
+    positions = ['bl', 'tl', 'br', 'tr']
+    filenames = []
+
+    for idx, (recording, position, mic_name) in enumerate(zip(recordings, positions, mic_names)):
+        filename = f"{position}.wav"
+        filepath = os.path.join(output_dir, filename)
+
+        # Convert floating-point audio to 16-bit integer format for WAV file
+        audio_data = (recording * 32767).astype(np.int16)
+        write(filepath, sample_rate, audio_data)
+
+        filenames.append(filepath)
+        print(f"Saved: {filepath}")
+        print(f"  Position: {position}")
+        print(f"  Device: {mic_name}")
+        print(f"  Samples: {len(recording)}")
+        print(f"  Duration: {len(recording)/sample_rate:.3f}s")
+    
+    return filenames
+
+def main():
+    """Record a synchronized audio clip from 4 microphones and save to files."""
+    print("=" * 70)
+    print("4-Microphone Synchronized Recording System")
+    print("For TDOA-based Direction of Arrival")
+    print("=" * 70)
+
+    # Select microphones
+    mic_indices, mic_names = select_microphones()
+    
+    print("\n" + "=" * 70)
+    print("Selected microphones:")
+    positions = ['bottom_left', 'bottom_right', 'top_left', 'top_right']
+    for pos, idx, name in zip(positions, mic_indices, mic_names):
+        print(f"  {pos}: [{idx}] {name}")
+    print("=" * 70)
+
+    # Confirm before recording
+    input("\nPress Enter to start synchronized recording...")
+    
+    # Record from all 4 microphones simultaneously
+    recordings = record_synchronized(mic_indices)
+    
+    # Save recordings
+    print("\nSaving recordings...")
+    filenames = save_recordings(recordings, mic_names)
+    
+    print("\n" + "=" * 70)
+    print("Recording session complete!")
+    print(f"Files saved to: {os.path.dirname(filenames[0])}")
+    print("=" * 70)
+
+if __name__ == "__main__":
+    main()

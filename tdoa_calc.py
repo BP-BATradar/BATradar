@@ -52,7 +52,7 @@ def get_all_tdoa_of_chunk_index_by_gcc_phat(
         # Compute TDoA using GCC-PHAT. Use sig=audio1 and refsig=audio2 so that
         # the returned tau corresponds to (t1 - t2). That matches the multilateration
         # convention used later where distance difference = (dist1 - dist2) = tau * c.
-        tdoa, cc = gcc_phat(sig=sig1, refsig=sig2, fs=sr_ref, max_tau=None)
+        tdoa, cc = gcc_phat(sig=sig2, refsig=sig1, fs=sr_ref, max_tau=None)
 
         tdoa_pair = TdoaPair(mic1=mic1, mic2=mic, tdoa=tdoa)
         tdoa_results.append(tdoa_pair)
