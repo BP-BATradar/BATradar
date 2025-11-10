@@ -1,6 +1,6 @@
 
 import numpy as np
-import config
+import core.config as config
 from core.tdoaPair import TdoaPair
 from scipy.optimize import least_squares
 
