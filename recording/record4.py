@@ -4,7 +4,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import sounddevice as sd
 from scipy.io.wavfile import write
-from datetime import datetime
+from datetime import datetime, time
 import numpy as np
 from core.config import SAMPLE_RATE, CHUNK_DURATION
 from multi_device_recorder import MultiDeviceRecorder
@@ -27,7 +27,7 @@ def select_microphones():
     mic_names = []
 
     print("\nPlease select 4 microphones by entering their device numbers:")
-    mic_positions = ['bottom_left', 'bottom_right', 'top_left', 'top_right']
+    mic_positions = ['bl', 'br', 'tl', 'tr']
 
     for position in mic_positions:
         while True:
@@ -94,7 +94,7 @@ def record_synchronized(mic_indices, duration=CHUNK_DURATION, sample_rate=SAMPLE
 
     return aligned_recordings
 
-def save_recordings(recordings, mic_names, sample_rate=SAMPLE_RATE):
+def save_recordings(recordings, mic_names, sample_rate=SAMPLE_RATE, recordingNumber = None):
     """
     Save each microphone's audio to its own WAV file.
 
@@ -116,7 +116,7 @@ def save_recordings(recordings, mic_names, sample_rate=SAMPLE_RATE):
     filenames = []
 
     for idx, (recording, position, mic_name) in enumerate(zip(recordings, positions, mic_names)):
-        filename = f"{position}.wav"
+        filename = f"{position}{recordingNumber}.wav"
         filepath = os.path.join(output_dir, filename)
 
         # Convert floating-point audio to 16-bit integer format for WAV file
@@ -144,7 +144,7 @@ def main():
     
     print("\n" + "=" * 70)
     print("Selected microphones:")
-    positions = ['bottom_left', 'bottom_right', 'top_left', 'top_right']
+    positions = ["bl", "br", "tl", "tr"]
     for pos, idx, name in zip(positions, mic_indices, mic_names):
         print(f"  {pos}: [{idx}] {name}")
     print("=" * 70)
@@ -153,16 +153,20 @@ def main():
     input("\nPress Enter to start synchronized recording...")
     
     # Record from all 4 microphones simultaneously
-    recordings = record_synchronized(mic_indices)
-    
-    # Save recordings
-    print("\nSaving recordings...")
-    filenames = save_recordings(recordings, mic_names)
-    
-    print("\n" + "=" * 70)
-    print("Recording session complete!")
-    print(f"Files saved to: {os.path.dirname(filenames[0])}")
-    print("=" * 70)
+    counter = 1
+    while True:
+        recordings = record_synchronized(mic_indices)
+        
+        # Save recordings
+        print("\nSaving recordings...")
+        filenames = save_recordings(recordings, mic_names, counter)
+        counter += 1
+        
+        print("\n" + "=" * 70)
+        print("Recording session complete!")
+        print(f"Files saved to: {os.path.dirname(filenames[0])}")
+        print("=" * 70)
+        time.sleep(3)
 
 if __name__ == "__main__":
     main()
