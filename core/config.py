@@ -13,7 +13,7 @@ DEFAULT_SOUND_SPEED = 343.0  # meters per second (typical room temperature)
 
 # Where our microphones are positioned (square setup, 2 meters apart)
 # All mics are at ground level (z=0)
-ARRAY_SIZE = 2.0  # Distance between microphones in meters
+ARRAY_SIZE = 3.0  # Distance between microphones in meters
 MIC_POSITIONS = {
     'top_left': (0.0, ARRAY_SIZE),
     'top_right': (ARRAY_SIZE, ARRAY_SIZE),
@@ -23,19 +23,10 @@ MIC_POSITIONS = {
 
 # Processing settings
 REFERENCE_MIC_INDEX = 0  # Use bottom-left mic as our timing reference
-MAX_TDOA = ARRAY_SIZE * 1.414 / DEFAULT_SOUND_SPEED  # Max time delay (diagonal distance)
+MAX_TDOA = ARRAY_SIZE * 4.242 / DEFAULT_SOUND_SPEED  # Max time delay (diagonal distance)
 
 # Cross-correlation settings - helps us find timing differences reliably
 USE_GCC_PHAT = True  # Phase transform makes correlation more robust to noise
 CORRELATION_MAX_LAG = int(MAX_TDOA * SAMPLE_RATE * 1.5)  # How far to search for correlation peaks
-
-# Calibration: fixed timing offsets measured during synchronization experiments.
-# Positive values mean the microphone tends to hear sounds later than expected.
-MIC_BIAS_SECONDS = {
-    'bottom_left': 0.0,
-    'bottom_right': 0.0,
-    'top_left': 0.0,
-    'top_right': 0.0,
-}
 
 
