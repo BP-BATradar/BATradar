@@ -18,9 +18,12 @@ Features:
 """
 
 import argparse
+import asyncio
+import time
 import queue
 import sys
 from datetime import datetime
+import threading
 from typing import Optional
 import json
 
@@ -137,10 +140,37 @@ def stream_predict(
 
             # Format and display results
             ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            label = "drone" if proba >= 0.5 else "unknown"
+            label = "drone" if proba >= 0.95 else "unknown"
+            msg = {
+                "timestamp": ts,
+                "prob_drone": float(proba),
+                "label": label,
+            }
             prefix = f"[{mic_label}] " if mic_label else ""
             print(f"{prefix}{ts}  prob_drone={proba:.4f}  label={label}")
+            yield msg
 
+async def stream_predict_websocket(model_path, device, mic_label, output_interval=5.0):
+    q = queue.Queue()
+
+    def audio_thread():
+        for msg in stream_predict(model_path, device, mic_label):
+            q.put(msg)
+
+    threading.Thread(target=audio_thread, daemon=True).start()
+    last_time = 0
+
+    while True:
+        try:
+            msg = q.get(timeout=0.1)
+        except queue.Empty:
+            await asyncio.sleep(0.01)
+            continue
+
+        now = time.time()
+        if now - last_time >= output_interval:
+            yield msg
+            last_time = now
 
 # Main function to set up and run the RNN audio server
 def main() -> None:
@@ -155,15 +185,18 @@ def main() -> None:
     if args.list_devices:
         list_devices()
         return
-
-    # Start real-time prediction stream
-    stream_predict(
-        model_path=args.model_path,
-        device=args.device,
-        mic_label=args.mic_id,
-        block_seconds=1.0,
-        dtype="float32",
-    )
+    
+    try:
+        for msg in stream_predict(
+            model_path=args.model_path,
+            device=args.device,
+            mic_label=args.mic_id,
+            block_seconds=1.0,
+            dtype="float32",
+        ):
+            pass 
+    except KeyboardInterrupt:
+        print("Stopping audio server...")
 
 
 if __name__ == "__main__":

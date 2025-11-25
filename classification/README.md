@@ -47,7 +47,7 @@ python -m src.predict --dir data/djineo/ --model-path models/cnn_model.joblib # 
 
 ```bash
 # List devices first
-python -m src.audio_server_rnn --list-devices
+python -m classification.src.audio_server_rnn --list-devices
 
 # Run server
 python -m classification.src.audio_server_rnn --device 3 --mic-id "Main Mic"

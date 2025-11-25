@@ -1,4 +1,4 @@
-import { Activity, Radio, Shield } from 'lucide-react';
+import { Radio } from 'lucide-react';
 
 export default function Header() {
   return (
