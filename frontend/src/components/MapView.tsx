@@ -74,13 +74,52 @@ export function Microphones({ label }: { label: string }) {
     { id: "M4", x: 3, y: 3 },
   ];
 
-  const scale = 150;
-
+  const scale = 200;
+  const dotSize = 24;
+  const offset = dotSize / 2;
+  const lineStyle = "absolute border-gray-400 border-dashed";
   return (
-    <div className="absolute top-1/2 right-1/4 w-[395px] h-[465px] transform -translate-y-1/2">
+    <div className="absolute top-1/2 right-1/4 w-[560px] h-[650px] transform -translate-y-1/2 animate-pulse">
+      {/* top */}
+      <div
+        className={`${lineStyle} border-t-2`}
+        style={{
+          left: `${microphones[0].x * scale + offset}px`,
+          top: `${microphones[0].y * scale + offset}px`,
+          width: `${3 * scale}px`,
+        }}
+      />
+      {/* bottom */}
+      <div
+        className={`${lineStyle} border-t-2`}
+        style={{
+          left: `${microphones[1].x * scale + offset}px`,
+          top: `${microphones[1].y * scale + offset}px`,
+          width: `${3 * scale}px`,
+        }}
+      />
+      {/* left */}
+      <div
+        className={`${lineStyle} border-l-2`}
+        style={{
+          left: `${microphones[0].x * scale + offset}px`,
+          top: `${microphones[0].y * scale + offset}px`,
+          height: `${3 * scale}px`,
+        }}
+      />
+      {/* right */}
+      <div
+        className={`${lineStyle} border-l-2`}
+        style={{
+          left: `${microphones[2].x * scale + offset}px`,
+          top: `${microphones[2].y * scale + offset}px`,
+          height: `${3 * scale}px`,
+        }}
+      />  
+
       {microphones.map((mic) => (
         <div
-          className={`absolute w-6 h-6 rounded-full border-2 border-gray-400 flex items-center justify-center text-xs font-bold ${label === "drone" ? "bg-emerald-600 animate-pulse"  : "bg-gray-600 animate-pulse"
+          className={`absolute w-6 h-6 rounded-full border-2 border-gray-400 flex items-center justify-center text-xs font-bold ${label === "drone" ? "bg-emerald-600"  : "bg-gray-600"
             }`}
           style={{
             left: `${mic.x * scale}px`,
