@@ -1,5 +1,7 @@
 import { Crosshair } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import Checkbox from './test';
+
 
 export default function MapView() {
   const [label, setLabel] = useState("unknown");
@@ -35,6 +37,7 @@ export default function MapView() {
       </div>
       <Microphones label={label} />
       <Coordinates label={label} />
+      <Checkbox />
     </div>
   );
 }
@@ -82,7 +85,7 @@ export function Microphones({ label }: { label: string }) {
     <div className="absolute top-1/2 right-1/4 w-[560px] h-[650px] transform -translate-y-1/2 animate-pulse">
       {/* top */}
       <div
-        className={`${lineStyle} border-t-2`}
+        className={`${lineStyle} border-t-2 ${label === "drone" ? "bg-emerald-600"  : "bg-gray-600"}`}
         style={{
           left: `${microphones[0].x * scale + offset}px`,
           top: `${microphones[0].y * scale + offset}px`,
@@ -91,7 +94,7 @@ export function Microphones({ label }: { label: string }) {
       />
       {/* bottom */}
       <div
-        className={`${lineStyle} border-t-2`}
+        className={`${lineStyle} border-t-2 ${label === "drone" ? "bg-emerald-600"  : "bg-gray-600"}`}
         style={{
           left: `${microphones[1].x * scale + offset}px`,
           top: `${microphones[1].y * scale + offset}px`,
@@ -100,7 +103,7 @@ export function Microphones({ label }: { label: string }) {
       />
       {/* left */}
       <div
-        className={`${lineStyle} border-l-2`}
+        className={`${lineStyle} border-l-2 ${label === "drone" ? "bg-emerald-600"  : "bg-gray-600"}`}
         style={{
           left: `${microphones[0].x * scale + offset}px`,
           top: `${microphones[0].y * scale + offset}px`,
@@ -109,7 +112,7 @@ export function Microphones({ label }: { label: string }) {
       />
       {/* right */}
       <div
-        className={`${lineStyle} border-l-2`}
+        className={`${lineStyle} border-l-2 ${label === "drone" ? "bg-emerald-600"  : "bg-gray-600"}`}
         style={{
           left: `${microphones[2].x * scale + offset}px`,
           top: `${microphones[2].y * scale + offset}px`,
