@@ -1,22 +1,61 @@
 import asyncio
 from fastapi import FastAPI, WebSocket
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from classification.src.audio_server_rnn import stream_predict_websocket
+from system_manager import SystemManager
 
 app = FastAPI()
 
-@app.websocket("/classification")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+manager = SystemManager(
+    model_path="classification/models/rnn_model.joblib",
+    device=0,
+    mic_label="Main Mic",
+    detection_threshold=0.5,
+    localization_cycles=5,
+    cycle_interval=4.0,
+    cooldown_seconds=25.0,
+)
+
+@app.on_event("startup")
+async def startup_event():
+    manager.start()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    manager.stop()
+
+@app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
     await ws.accept()
+    
+    try:
+        async for msg in manager.event_stream():
+            await ws.send_json(msg)
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+    finally:
+        await ws.close()
 
-    async for msg in stream_predict_websocket(
-        model_path="classification/models/rnn_model.joblib",
-        device=0,
-        mic_label="Main Mic",
-        output_interval=5.0,
-    ):
-        await ws.send_json(msg)
+@app.post("/api/trigger-localization")
+async def trigger_localization():
+    manager.trigger_localization()
+    return {"status": "ok", "message": "Localization triggered"}
+
+@app.get("/api/status")
+async def get_status():
+    return {
+        "state": manager.state.value,
+        "latest_localization": manager._latest_localization,
+    }
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
