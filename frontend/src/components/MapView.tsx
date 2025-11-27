@@ -1,5 +1,6 @@
 import { Crosshair, Compass, Ruler, Radio, Locate } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import MicrophoneIcon from './test';
 
 const API_HOST = import.meta.env.VITE_API_HOST || window.location.hostname;
 const API_PORT = import.meta.env.VITE_API_PORT || '8000';
@@ -270,6 +271,16 @@ export function Microphones({ label, localization }: MicrophonesProps) {
 
   return (
     <div className={`relative w-[580px] h-[580px] ${isActive ? "animate-pulse" : ""}`}>
+      {/* top dimension label */}
+      <div
+        className="absolute top-1/2 transform -translate-y-1/2 text-xs text-gray-300"
+        style={{
+          left: `${microphones[0].x * scale + offset + 280}px`,
+          top: `${microphones[0].y * scale + offset - 10}px`
+        }}
+      >
+        {arraySize}m
+      </div>
       {/* top */}
       <div
         className={`${lineStyle} border-t-2 ${isActive ? "bg-emerald-600" : "bg-gray-600"}`}
@@ -297,6 +308,16 @@ export function Microphones({ label, localization }: MicrophonesProps) {
           height: `${3 * scale}px`,
         }}
       />
+      {/* right dimension label */}
+      <div
+        className="absolute top-1/2 transform -translate-y-1/2 text-xs text-gray-300"
+        style={{
+          left: `${microphones[2].x * scale + offset + 10}px`, 
+          top: `${microphones[2].y * scale + offset + 280}px`,
+        }}
+      >
+        {arraySize}m
+      </div>
       {/* right */}
       <div
         className={`${lineStyle} border-l-2 ${isActive ? "bg-emerald-600" : "bg-gray-600"}`}
@@ -318,6 +339,7 @@ export function Microphones({ label, localization }: MicrophonesProps) {
             top: `${mic.y * scale}px`,
           }}
         >
+          <MicrophoneIcon />
         </div>
       ))}
       
