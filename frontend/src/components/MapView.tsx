@@ -89,6 +89,7 @@ export default function MapView() {
           }}
         ></div>
       </div>
+
       
       <div className="flex h-full">
         <div className="w-[280px] flex-shrink-0 p-4 space-y-3 z-10">
@@ -269,6 +270,7 @@ export function Microphones({ label, localization }: MicrophonesProps) {
 
   const isActive = label === "drone" || label === "listening";
 
+
   return (
     <div className={`relative w-[580px] h-[580px] ${isActive ? "animate-pulse" : ""}`}>
       {/* top dimension label */}
@@ -283,29 +285,35 @@ export function Microphones({ label, localization }: MicrophonesProps) {
       </div>
       {/* top */}
       <div
-        className={`${lineStyle} border-t-2 ${isActive ? "bg-emerald-600" : "bg-gray-600"}`}
+
+
         style={{
           left: `${microphones[0].x * scale + offset}px`,
           top: `${microphones[0].y * scale + offset}px`,
-          width: `${3 * scale}px`,
+          width: widthValue,
         }}
-      />
+      >
+      </div>
       {/* bottom */}
       <div
+
         className={`${lineStyle} border-t-2 ${isActive ? "bg-emerald-600" : "bg-gray-600"}`}
+
         style={{
           left: `${microphones[1].x * scale + offset}px`,
           top: `${microphones[1].y * scale + offset}px`,
-          width: `${3 * scale}px`,
+          width: widthValue,
         }}
       />
       {/* left */}
       <div
+
         className={`${lineStyle} border-l-2 ${isActive ? "bg-emerald-600" : "bg-gray-600"}`}
+
         style={{
           left: `${microphones[0].x * scale + offset}px`,
           top: `${microphones[0].y * scale + offset}px`,
-          height: `${3 * scale}px`,
+          height: widthValue,
         }}
       />
       {/* right dimension label */}
@@ -320,13 +328,15 @@ export function Microphones({ label, localization }: MicrophonesProps) {
       </div>
       {/* right */}
       <div
+
         className={`${lineStyle} border-l-2 ${isActive ? "bg-emerald-600" : "bg-gray-600"}`}
+
         style={{
           left: `${microphones[2].x * scale + offset}px`,
           top: `${microphones[2].y * scale + offset}px`,
-          height: `${3 * scale}px`,
+          height: widthValue,
         }}
-      />  
+      />
 
       {microphones.map((mic) => (
         <div
@@ -334,6 +344,7 @@ export function Microphones({ label, localization }: MicrophonesProps) {
           className={`absolute w-6 h-6 rounded-full border-2 border-gray-400 flex items-center justify-center text-xs font-bold ${
             isActive ? "bg-emerald-600" : "bg-gray-600"
           }`}
+
           style={{
             left: `${mic.x * scale}px`,
             top: `${mic.y * scale}px`,
