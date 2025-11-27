@@ -2,12 +2,10 @@ import { Crosshair, Compass, Ruler, Radio, Locate } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import MicrophoneIcon from './test';
 
-const API_HOST = import.meta.env.VITE_API_HOST || window.location.hostname;
-const API_PORT = import.meta.env.VITE_API_PORT || '8000';
+const API_HOST = '172.20.10.4';
+const API_PORT = '8000';
 const WS_URL = `ws://${API_HOST}:${API_PORT}/ws`;
 const API_URL = `http://${API_HOST}:${API_PORT}`;
-
-console.log("API Configuration:", { API_HOST, API_PORT, WS_URL, API_URL });
 
 interface LocalizationData {
   azimuth: number;
@@ -151,13 +149,19 @@ function DroneBox({ label, isLocalizing, wsConnected }: { label: DisplayLabel; i
       <div className="flex items-center gap-2 mb-3">
         <Radio className={`w-4 h-4 ${isLocalizing ? "text-amber-400" : "text-emerald-400"}`} />
         <span className="text-sm font-medium text-gray-300">DRONE</span>
-        <div className={`w-2 h-2 rounded-full ml-auto ${wsConnected ? "bg-emerald-400" : "bg-red-400"}`} title={wsConnected ? "Connected" : "Disconnected"} />
+        <div className={`w-2 h-2 rounded-full ml-auto ${wsConnected ? "bg-emerald-400" : "bg-red-400"}`} title={wsConnected ? `Connected to ${API_HOST}` : `Disconnected from ${API_HOST}`} />
       </div>
       <div className="space-y-1 text-xs font-mono">
         <div className="flex justify-between">
           <span className="text-gray-500">LABEL</span>
           <span className={getTextColor()}>
             {getDisplayText()}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500">SERVER</span>
+          <span className={wsConnected ? "text-emerald-400" : "text-red-400"}>
+            {API_HOST}:{API_PORT}
           </span>
         </div>
       </div>
