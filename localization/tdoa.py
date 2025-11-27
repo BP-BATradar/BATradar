@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Dict, List, Mapping, Optional, Tuple
 from scipy import signal as scipy_signal
-from ..config.config import SAMPLE_RATE, SPEED_OF_SOUND, USE_GCC_PHAT, CORRELATION_MAX_LAG, REFERENCE_MIC_INDEX, ARRAY_SIZE, MAX_TDOA
+from config.config import SAMPLE_RATE, SPEED_OF_SOUND, USE_GCC_PHAT, CORRELATION_MAX_LAG, REFERENCE_MIC_INDEX, ARRAY_SIZE, MAX_TDOA
 
 
 class TDOACalculator:

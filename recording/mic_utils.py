@@ -3,8 +3,8 @@ from typing import Tuple, List
 import numpy as np
 import sounddevice as sd
 
-from ..config.config import SAMPLE_RATE, CHUNK_DURATION
-from .multi_device_recorder import MultiDeviceRecorder
+from config.config import SAMPLE_RATE, CHUNK_DURATION
+from recording.multi_device_recorder import MultiDeviceRecorder
 
 
 def list_microphones():

@@ -33,7 +33,7 @@ import joblib
 import tensorflow as tf
 from tensorflow.keras import models
 
-from .features import FeatureConfig, extract_mfcc_sequence_from_path, load_mono_audio, compute_mfcc_sequence
+from classification.src.features import FeatureConfig, extract_mfcc_sequence_from_path, load_mono_audio, compute_mfcc_sequence
 
 
 # Lists all available audio input devices

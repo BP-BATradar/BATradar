@@ -1,12 +1,12 @@
 import numpy as np
 from typing import Dict, List, Optional, Tuple
 
-from .config.config import MIC_POSITIONS, MIC_ORDER, SAMPLE_RATE, CHUNK_DURATION
-from .recording.multi_device_recorder import MultiDeviceRecorder
-from .recording.record4_config import select_and_map_microphones, ensure_mic_configuration
-from .localization.tdoa import TDOACalculator
-from .localization.doa import DOACalculator
-from .localization.multilateration import MultilaterationCalculator
+from config.config import MIC_POSITIONS, MIC_ORDER, SAMPLE_RATE, CHUNK_DURATION
+from recording.multi_device_recorder import MultiDeviceRecorder
+from recording.record4_config import select_and_map_microphones, ensure_mic_configuration
+from localization.tdoa import TDOACalculator
+from localization.doa import DOACalculator
+from localization.multilateration import MultilaterationCalculator
 
 
 class LocalizationService:

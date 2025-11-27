@@ -36,13 +36,16 @@ async def shutdown_event():
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
     await ws.accept()
+    print("WebSocket client connected")
     
     try:
         async for msg in manager.event_stream():
+            print(f"Sending to frontend: {msg['type']}")
             await ws.send_json(msg)
     except Exception as e:
         print(f"WebSocket error: {e}")
     finally:
+        print("WebSocket client disconnected")
         await ws.close()
 
 @app.post("/api/trigger-localization")

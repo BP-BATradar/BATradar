@@ -6,8 +6,12 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, AsyncGenerator, Dict, Any
 
-from .classification.src.audio_server_rnn import stream_predict
-from .localization_service import LocalizationService
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from classification.src.audio_server_rnn import stream_predict
+from localization_service import LocalizationService
 
 
 class SystemState(Enum):
@@ -82,6 +86,7 @@ class SystemManager:
                 "label": msg["label"],
             }
             self.message_queue.put(event)
+            print(f"Queued classification: {msg['label']} ({msg['prob_drone']:.2f})")
             
             if self._should_localize(msg["prob_drone"]):
                 self.message_queue.put({
@@ -172,9 +177,9 @@ class SystemManager:
     async def event_stream(self) -> AsyncGenerator[Dict[str, Any], None]:
         while True:
             try:
-                msg = self.message_queue.get(timeout=0.1)
+                msg = self.message_queue.get_nowait()
                 yield msg
             except queue.Empty:
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(0.1)
                 continue
 

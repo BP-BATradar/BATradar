@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.optimize import least_squares, minimize
 from typing import Tuple, Optional, List
-from ..config.config import SPEED_OF_SOUND, REFERENCE_MIC_INDEX
+from config.config import SPEED_OF_SOUND, REFERENCE_MIC_INDEX
 
 
 class MultilaterationCalculator:

@@ -7,6 +7,8 @@ const API_PORT = import.meta.env.VITE_API_PORT || '8000';
 const WS_URL = `ws://${API_HOST}:${API_PORT}/ws`;
 const API_URL = `http://${API_HOST}:${API_PORT}`;
 
+console.log("API Configuration:", { API_HOST, API_PORT, WS_URL, API_URL });
+
 interface LocalizationData {
   azimuth: number;
   distance: number;
@@ -26,44 +28,67 @@ export default function MapView() {
   const [label, setLabel] = useState<DisplayLabel>("unknown");
   const [localization, setLocalization] = useState<LocalizationData | null>(null);
   const [isLocalizing, setIsLocalizing] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
 
   useEffect(() => {
-    const ws = new WebSocket(WS_URL);
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      
-      if (data.type === "classification") {
-        if (!isLocalizing) {
+    const connect = () => {
+      ws = new WebSocket(WS_URL);
+
+      ws.onopen = () => {
+        console.log("WebSocket connected");
+        setWsConnected(true);
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        console.log("WS message:", data);
+        
+        if (data.type === "classification") {
           setLabel(data.label);
-        }
-      } else if (data.type === "localization_start") {
-        setIsLocalizing(true);
-        if (data.manual) {
-          setLabel("listening");
-        }
-      } else if (data.type === "localization") {
-        setLocalization({
-          azimuth: data.azimuth,
-          distance: data.distance,
-          position_x: data.position_x,
-          position_y: data.position_y,
-          mic_distances: data.mic_distances,
-        });
-      } else if (data.type === "localization_end") {
-        setIsLocalizing(false);
-        if (data.manual) {
+        } else if (data.type === "localization_start") {
+          setIsLocalizing(true);
+          if (data.manual) {
+            setLabel("listening");
+          } else {
+            setLabel("drone");
+          }
+        } else if (data.type === "localization") {
+          setLocalization({
+            azimuth: data.azimuth,
+            distance: data.distance,
+            position_x: data.position_x,
+            position_y: data.position_y,
+            mic_distances: data.mic_distances,
+          });
+        } else if (data.type === "localization_end") {
+          setIsLocalizing(false);
           setLabel("unknown");
+        } else if (data.type === "localization_error") {
+          console.error("Localization error:", data.error);
         }
-      }
+      };
+
+      ws.onerror = (err) => {
+        console.error("WebSocket error:", err);
+      };
+
+      ws.onclose = () => {
+        console.log("WebSocket closed, reconnecting in 2s...");
+        setWsConnected(false);
+        reconnectTimeout = setTimeout(connect, 2000);
+      };
     };
 
-    ws.onerror = (err) => {
-      console.error("WebSocket error:", err);
-    };
+    connect();
 
-    return () => ws.close();
-  }, [isLocalizing]);
+    return () => {
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (ws) ws.close();
+    };
+  }, []);
 
   const handleTriggerLocalization = async () => {
     try {
@@ -93,7 +118,7 @@ export default function MapView() {
       
       <div className="flex h-full">
         <div className="w-[280px] flex-shrink-0 p-4 space-y-3 z-10">
-          <DroneBox label={label} isLocalizing={isLocalizing} />
+          <DroneBox label={label} isLocalizing={isLocalizing} wsConnected={wsConnected} />
           <DirectionBox azimuth={localization?.azimuth ?? null} />
           <DistanceBox distance={localization?.distance ?? null} />
           <MultilaterationBox micDistances={localization?.mic_distances ?? null} />
@@ -108,7 +133,7 @@ export default function MapView() {
   );
 }
 
-function DroneBox({ label, isLocalizing }: { label: DisplayLabel; isLocalizing: boolean }) {
+function DroneBox({ label, isLocalizing, wsConnected }: { label: DisplayLabel; isLocalizing: boolean; wsConnected: boolean }) {
   const getDisplayText = () => {
     if (label === "listening") return "Manual Listening";
     if (label === "drone") return "Drone";
@@ -126,6 +151,7 @@ function DroneBox({ label, isLocalizing }: { label: DisplayLabel; isLocalizing: 
       <div className="flex items-center gap-2 mb-3">
         <Radio className={`w-4 h-4 ${isLocalizing ? "text-amber-400" : "text-emerald-400"}`} />
         <span className="text-sm font-medium text-gray-300">DRONE</span>
+        <div className={`w-2 h-2 rounded-full ml-auto ${wsConnected ? "bg-emerald-400" : "bg-red-400"}`} title={wsConnected ? "Connected" : "Disconnected"} />
       </div>
       <div className="space-y-1 text-xs font-mono">
         <div className="flex justify-between">
