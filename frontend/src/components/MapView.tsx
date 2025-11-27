@@ -277,7 +277,7 @@ export function Microphones({ label, localization }: MicrophonesProps) {
       <div
         className="absolute top-1/2 transform -translate-y-1/2 text-xs text-gray-300"
         style={{
-          left: `${microphones[0].x * scale + offset + 280}px`,
+          left: `${microphones[0].x * scale + offset + 260}px`,
           top: `${microphones[0].y * scale + offset - 10}px`
         }}
       >
