@@ -53,21 +53,6 @@ class SystemManager:
     def trigger_localization(self):
         self._manual_trigger.set()
         
-    def _should_localize(self, prob_drone: float) -> bool:
-        if self._manual_trigger.is_set():
-            self._manual_trigger.clear()
-            self._is_manual_localization = True
-            return True
-        
-        if prob_drone < self.detection_threshold:
-            return False
-            
-        now = time.time()
-        if now - self._last_localization_time < self.cooldown_seconds:
-            return False
-        
-        self._is_manual_localization = False
-        return True
     
     def _run_classification(self):
         for msg in stream_predict(
@@ -79,6 +64,15 @@ class SystemManager:
             if self.stop_event.is_set():
                 break
             
+            if self._manual_trigger.is_set():
+                self._manual_trigger.clear()
+                self._is_manual_localization = True
+                self.message_queue.put({
+                    "type": "localization_start",
+                    "manual": True
+                })
+                break
+            
             event = {
                 "type": "classification",
                 "timestamp": msg["timestamp"],
@@ -86,14 +80,16 @@ class SystemManager:
                 "label": msg["label"],
             }
             self.message_queue.put(event)
-            print(f"Queued classification: {msg['label']} ({msg['prob_drone']:.2f})")
             
-            if self._should_localize(msg["prob_drone"]):
-                self.message_queue.put({
-                    "type": "localization_start",
-                    "manual": self._is_manual_localization
-                })
-                break
+            if msg["prob_drone"] >= self.detection_threshold:
+                now = time.time()
+                if now - self._last_localization_time >= self.cooldown_seconds:
+                    self._is_manual_localization = False
+                    self.message_queue.put({
+                        "type": "localization_start",
+                        "manual": False
+                    })
+                    break
     
     def _run_localization_sequence(self):
         self.state = SystemState.LOCALIZING
@@ -155,14 +151,36 @@ class SystemManager:
     
     def _main_loop(self):
         while not self.stop_event.is_set():
-            self.stop_event.clear()
-            
-            self._run_classification()
+            try:
+                self._run_classification()
+            except Exception as e:
+                print(f"Classification error: {e}")
+                self.message_queue.put({
+                    "type": "classification",
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "prob_drone": 0.0,
+                    "label": "unknown",
+                })
+                time.sleep(2.0)
+                continue
             
             if self.stop_event.is_set():
                 break
             
-            self._run_localization_sequence()
+            try:
+                self._run_localization_sequence()
+            except Exception as e:
+                print(f"Localization sequence error: {e}")
+                self.message_queue.put({
+                    "type": "localization_error",
+                    "error": str(e)
+                })
+                self.message_queue.put({
+                    "type": "localization_end",
+                    "manual": self._is_manual_localization
+                })
+                self._is_manual_localization = False
+                self.state = SystemState.MONITORING
     
     def start(self):
         self.stop_event.clear()
