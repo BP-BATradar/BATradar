@@ -148,7 +148,7 @@ function DirectionBox({ azimuth }: { azimuth: number | null }) {
       </div>
       <div className="space-y-1 text-xs font-mono">
         <div className="flex justify-between">
-          <span className="text-gray-500">AZIMUTH</span>
+          <span className="text-gray-500">ANGLE</span>
           <span className="text-gray-300">
             {azimuth !== null ? `${azimuth.toFixed(1)}` : "--"}
           </span>
