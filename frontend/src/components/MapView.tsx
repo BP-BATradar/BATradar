@@ -255,8 +255,8 @@ export function Microphones({ label, localization }: MicrophonesProps) {
   const dotSize = 24;
   const offset = dotSize / 2;
   const lineStyle = "absolute border-gray-400 border-dashed";
-  
   const arraySize = 3.0;
+   const widthValue = `${arraySize * scale}px`
   
   let targetDotPosition: { left: number; top: number } | null = null;
   if (localization) {
@@ -285,8 +285,7 @@ export function Microphones({ label, localization }: MicrophonesProps) {
       </div>
       {/* top */}
       <div
-
-
+        className={`${lineStyle} border-t-2 ${isActive ? "bg-emerald-600" : "bg-gray-600"}`}
         style={{
           left: `${microphones[0].x * scale + offset}px`,
           top: `${microphones[0].y * scale + offset}px`,
