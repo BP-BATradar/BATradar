@@ -69,6 +69,7 @@ def stream_predict(
     mic_label: Optional[str],
     block_seconds: float = 1.0,
     dtype: str = "float32",
+    stop_event: Optional[threading.Event] = None,
 ):
     # Load the RNN model and configuration
     model, cfg = load_model_bundle(model_path)
@@ -110,9 +111,14 @@ def stream_predict(
         callback=callback,
     ):
         while True:
+            if stop_event is not None and stop_event.is_set():
+                print("Stop event received, exiting stream_predict")
+                break
             try:
                 # Get audio block from queue
-                block = audio_q.get()
+                block = audio_q.get(timeout=0.5)
+            except queue.Empty:
+                continue
             except KeyboardInterrupt:
                 print("Interrupted by user")
                 break
@@ -150,17 +156,21 @@ def stream_predict(
             print(f"{prefix}{ts}  prob_drone={proba:.4f}  label={label}")
             yield msg
 
-async def stream_predict_websocket(model_path, device, mic_label, output_interval=5.0):
+async def stream_predict_websocket(model_path, device, mic_label, output_interval=5.0, stop_event: Optional[threading.Event] = None):
     q = queue.Queue()
 
     def audio_thread():
-        for msg in stream_predict(model_path, device, mic_label):
+        for msg in stream_predict(model_path, device, mic_label, stop_event=stop_event):
             q.put(msg)
+            if stop_event is not None and stop_event.is_set():
+                break
 
     threading.Thread(target=audio_thread, daemon=True).start()
     last_time = 0
 
     while True:
+        if stop_event is not None and stop_event.is_set():
+            break
         try:
             msg = q.get(timeout=0.1)
         except queue.Empty:
