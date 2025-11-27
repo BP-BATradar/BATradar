@@ -1,6 +1,6 @@
 import { Crosshair } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import Checkbox from './test';
+import MicrophoneIcon from './test';
 
 
 export default function MapView() {
@@ -37,7 +37,6 @@ export default function MapView() {
       </div>
       <Microphones label={label} />
       <Coordinates label={label} />
-      <Checkbox />
     </div>
   );
 }
@@ -81,54 +80,76 @@ export function Microphones({ label }: { label: string }) {
   const dotSize = 24;
   const offset = dotSize / 2;
   const lineStyle = "absolute border-gray-400 border-dashed";
+  const arraySize = 3;
+  const widthValue = `${arraySize * scale}px`
   return (
     <div className="absolute top-1/2 right-1/4 w-[560px] h-[650px] transform -translate-y-1/2 animate-pulse">
       {/* top */}
       <div
-        className={`${lineStyle} border-t-2 ${label === "drone" ? "bg-emerald-600"  : "bg-gray-600"}`}
+        className="absolute top-1/2 transform -translate-y-1/2 text-xs text-gray-300"
+        style={{
+          left: `${microphones[0].x * scale + offset + 280}px`,
+          top: `${microphones[0].y * scale + offset - 10}px`
+        }}
+      >
+        {arraySize}m
+      </div>
+      <div
+        className={`${lineStyle} border-t-2 ${label === "drone" ? "bg-emerald-600" : "bg-gray-600"}`}
         style={{
           left: `${microphones[0].x * scale + offset}px`,
           top: `${microphones[0].y * scale + offset}px`,
-          width: `${3 * scale}px`,
+          width: widthValue,
         }}
-      />
+      >
+      </div>
       {/* bottom */}
       <div
-        className={`${lineStyle} border-t-2 ${label === "drone" ? "bg-emerald-600"  : "bg-gray-600"}`}
+        className={`${lineStyle} border-t-2 ${label === "drone" ? "bg-emerald-600" : "bg-gray-600"}`}
         style={{
           left: `${microphones[1].x * scale + offset}px`,
           top: `${microphones[1].y * scale + offset}px`,
-          width: `${3 * scale}px`,
+          width: widthValue,
         }}
       />
       {/* left */}
       <div
-        className={`${lineStyle} border-l-2 ${label === "drone" ? "bg-emerald-600"  : "bg-gray-600"}`}
+        className={`${lineStyle} border-l-2 ${label === "drone" ? "bg-emerald-600" : "bg-gray-600"}`}
         style={{
           left: `${microphones[0].x * scale + offset}px`,
           top: `${microphones[0].y * scale + offset}px`,
-          height: `${3 * scale}px`,
+          height: widthValue,
         }}
       />
       {/* right */}
       <div
-        className={`${lineStyle} border-l-2 ${label === "drone" ? "bg-emerald-600"  : "bg-gray-600"}`}
+        className="absolute top-1/2 transform -translate-y-1/2 text-xs text-gray-300"
+        style={{
+          left: `${microphones[2].x * scale + offset + 10}px`, 
+          top: `${microphones[2].y * scale + offset + 280}px`,
+        }}
+      >
+        {arraySize}m
+      </div>
+      <div
+        className={`${lineStyle} border-l-2 ${label === "drone" ? "bg-emerald-600" : "bg-gray-600"}`}
         style={{
           left: `${microphones[2].x * scale + offset}px`,
           top: `${microphones[2].y * scale + offset}px`,
-          height: `${3 * scale}px`,
+          height: widthValue,
         }}
-      />  
+      />
 
       {microphones.map((mic) => (
         <div
-          className={`absolute w-6 h-6 rounded-full border-2 border-gray-400 flex items-center justify-center text-xs font-bold ${label === "drone" ? "bg-emerald-600"  : "bg-gray-600"
+          className={`absolute w-6 h-6 rounded-full border-2 border-gray-400 flex items-center justify-center text-xs font-bold ${label === "drone" ? "bg-emerald-600" : "bg-gray-600"
             }`}
           style={{
             left: `${mic.x * scale}px`,
             top: `${mic.y * scale}px`,
           }}
         >
+          <MicrophoneIcon />
         </div>
       ))}
     </div>
