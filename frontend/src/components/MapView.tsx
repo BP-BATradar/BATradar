@@ -336,10 +336,10 @@ interface MicrophonesProps {
 
 export function Microphones({ label, localization }: MicrophonesProps) {
   const microphones = [
-    { id: "M1", x: 0, y: 0 },
-    { id: "M2", x: 0, y: 3 },
-    { id: "M3", x: 3, y: 0 },
-    { id: "M4", x: 3, y: 3 },
+    { id: "M1", x: 0, y: 0, key: "bottom_left" },
+    { id: "M2", x: 0, y: 3, key: "top_left" },
+    { id: "M3", x: 3, y: 0, key: "bottom_right" },
+    { id: "M4", x: 3, y: 3, key: "top_right" },
   ];
 
   const scale = 180;
@@ -347,29 +347,31 @@ export function Microphones({ label, localization }: MicrophonesProps) {
   const offset = dotSize / 2;
   const lineStyle = "absolute border-gray-400 border-dashed";
   const arraySize = 3.0;
-   const widthValue = `${arraySize * scale}px`
+  const widthValue = `${arraySize * scale}px`;
+  
+  const centerX = (arraySize / 2) * scale + offset;
+  const centerY = (arraySize / 2) * scale + offset;
   
   let targetDotPosition: { left: number; top: number } | null = null;
   if (localization) {
     const posX = Math.max(0, Math.min(arraySize, localization.position_x));
     const posY = Math.max(0, Math.min(arraySize, localization.position_y));
     targetDotPosition = {
-      left: posX * scale,
-      top: (arraySize - posY) * scale,
+      left: posX * scale + offset,
+      top: (arraySize - posY) * scale + offset,
     };
   }
 
   const isActive = label === "drone" || label === "listening";
 
-
   return (
     <div className={`relative w-[580px] h-[580px] ${isActive ? "animate-pulse" : ""}`}>
       {/* top dimension label */}
       <div
-        className="absolute top-1/2 transform -translate-y-1/2 text-xs text-gray-300"
+        className="absolute text-xs text-gray-300"
         style={{
           left: `${microphones[0].x * scale + offset + 260}px`,
-          top: `${microphones[0].y * scale + offset - 10}px`
+          top: `${microphones[0].y * scale + offset - 25}px`
         }}
       >
         {arraySize}m
@@ -382,13 +384,10 @@ export function Microphones({ label, localization }: MicrophonesProps) {
           top: `${microphones[0].y * scale + offset}px`,
           width: widthValue,
         }}
-      >
-      </div>
+      />
       {/* bottom */}
       <div
-
         className={`${lineStyle} border-t-2 ${isActive ? "bg-emerald-600" : "bg-gray-600"}`}
-
         style={{
           left: `${microphones[1].x * scale + offset}px`,
           top: `${microphones[1].y * scale + offset}px`,
@@ -397,9 +396,7 @@ export function Microphones({ label, localization }: MicrophonesProps) {
       />
       {/* left */}
       <div
-
         className={`${lineStyle} border-l-2 ${isActive ? "bg-emerald-600" : "bg-gray-600"}`}
-
         style={{
           left: `${microphones[0].x * scale + offset}px`,
           top: `${microphones[0].y * scale + offset}px`,
@@ -408,7 +405,7 @@ export function Microphones({ label, localization }: MicrophonesProps) {
       />
       {/* right dimension label */}
       <div
-        className="absolute top-1/2 transform -translate-y-1/2 text-xs text-gray-300"
+        className="absolute text-xs text-gray-300"
         style={{
           left: `${microphones[2].x * scale + offset + 10}px`, 
           top: `${microphones[2].y * scale + offset + 280}px`,
@@ -418,9 +415,7 @@ export function Microphones({ label, localization }: MicrophonesProps) {
       </div>
       {/* right */}
       <div
-
         className={`${lineStyle} border-l-2 ${isActive ? "bg-emerald-600" : "bg-gray-600"}`}
-
         style={{
           left: `${microphones[2].x * scale + offset}px`,
           top: `${microphones[2].y * scale + offset}px`,
@@ -428,13 +423,62 @@ export function Microphones({ label, localization }: MicrophonesProps) {
         }}
       />
 
+      {/* Center dot */}
+      <div
+        className="absolute w-2 h-2 rounded-full bg-gray-500 opacity-60"
+        style={{
+          left: `${centerX - 4}px`,
+          top: `${centerY - 4}px`,
+        }}
+      />
+
+      {/* Distance lines from target to each mic */}
+      {targetDotPosition && localization && (
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          style={{ width: '580px', height: '580px' }}
+        >
+          {microphones.map((mic) => {
+            const micX = mic.x * scale + offset;
+            const micY = mic.y * scale + offset;
+            const dist = localization.mic_distances[mic.key as keyof typeof localization.mic_distances];
+            const midX = (targetDotPosition!.left + micX) / 2;
+            const midY = (targetDotPosition!.top + micY) / 2;
+            
+            return (
+              <g key={mic.id}>
+                <line
+                  x1={targetDotPosition!.left}
+                  y1={targetDotPosition!.top}
+                  x2={micX}
+                  y2={micY}
+                  stroke="#6b7280"
+                  strokeWidth="1"
+                  strokeDasharray="4 4"
+                  opacity="0.6"
+                />
+                <text
+                  x={midX}
+                  y={midY - 6}
+                  fill="#9ca3af"
+                  fontSize="10"
+                  textAnchor="middle"
+                  className="font-mono"
+                >
+                  {dist.toFixed(2)}m
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      )}
+
       {microphones.map((mic) => (
         <div
           key={mic.id}
           className={`absolute w-6 h-6 rounded-full border-2 border-gray-400 flex items-center justify-center text-xs font-bold ${
             isActive ? "bg-emerald-600" : "bg-gray-600"
           }`}
-
           style={{
             left: `${mic.x * scale}px`,
             top: `${mic.y * scale}px`,
@@ -448,8 +492,8 @@ export function Microphones({ label, localization }: MicrophonesProps) {
         <div
           className="absolute w-4 h-4 rounded-full bg-lime-400 animate-ping-slow"
           style={{
-            left: `${targetDotPosition.left + offset - 8}px`,
-            top: `${targetDotPosition.top + offset - 8}px`,
+            left: `${targetDotPosition.left - 8}px`,
+            top: `${targetDotPosition.top - 8}px`,
             boxShadow: '0 0 12px 4px rgba(163, 230, 53, 0.6)',
           }}
         />
@@ -458,8 +502,8 @@ export function Microphones({ label, localization }: MicrophonesProps) {
         <div
           className="absolute w-3 h-3 rounded-full bg-lime-300"
           style={{
-            left: `${targetDotPosition.left + offset - 6}px`,
-            top: `${targetDotPosition.top + offset - 6}px`,
+            left: `${targetDotPosition.left - 6}px`,
+            top: `${targetDotPosition.top - 6}px`,
           }}
         />
       )}

@@ -118,9 +118,19 @@ class MultilaterationCalculator:
         if initial_guess is not None:
             initial_guess = np.asarray(initial_guess, dtype=float)
         elif doa_unit_vec is not None:
-            initial_guess = self._initial_guess_from_doa_2d(doa_unit_vec, lower_bounds, upper_bounds)
+            # Prefer a radial search along the DOA ray, starting near the array
+            # center and moving slowly towards the array edges. This leans more
+            # strongly on the DOA azimuth while still respecting TDOA residuals.
+            initial_guess = self._radial_initial_guess_from_doa_2d(
+                doa_unit_vec,
+                residuals,
+                lower_bounds,
+                upper_bounds,
+            )
         else:
-            initial_guess = self._grid_search_initial_guess_2d(residuals, lower_bounds, upper_bounds, step=0.5)
+            initial_guess = self._grid_search_initial_guess_2d(
+                residuals, lower_bounds, upper_bounds, step=0.5
+            )
         
         result = least_squares(
             residuals,
@@ -162,6 +172,53 @@ class MultilaterationCalculator:
             t_max = np.max(upper_bounds - lower_bounds) * 0.5
         guess = center + doa_unit_vec * (0.7 * t_max)
         return np.clip(guess, lower_bounds, upper_bounds)
+    
+    def _radial_initial_guess_from_doa_2d(
+        self,
+        doa_unit_vec: np.ndarray,
+        residual_func,
+        lower_bounds: np.ndarray,
+        upper_bounds: np.ndarray,
+        num_steps: int = 15,
+    ) -> np.ndarray:
+        """
+        Start from the array center and move along the DOA angle towards the
+        array edges, picking the position with the lowest residual cost.
+        """
+        center = np.array(self.array_center, dtype=float)
+
+        # Determine maximum distance along DOA before hitting bounds
+        t_max = np.inf
+        for axis in range(2):
+            component = doa_unit_vec[axis]
+            if abs(component) < 1e-9:
+                continue
+            bound = upper_bounds[axis] if component > 0 else lower_bounds[axis]
+            t = (bound - center[axis]) / component
+            if t > 0:
+                t_max = min(t_max, t)
+
+        if not np.isfinite(t_max) or t_max <= 0:
+            # Fallback: use original DOA-based guess
+            return self._initial_guess_from_doa_2d(doa_unit_vec, lower_bounds, upper_bounds)
+
+        # Sample positions from very close to the center out towards the edge
+        # (but not exactly at the edge to avoid numerical issues).
+        radii = np.linspace(0.05 * t_max, 0.95 * t_max, num_steps)
+
+        best_pos = center
+        min_cost = float("inf")
+
+        for r in radii:
+            candidate = center + doa_unit_vec * r
+            candidate = np.clip(candidate, lower_bounds, upper_bounds)
+            res = residual_func(candidate)
+            cost = float(np.sum(np.square(res)))
+            if cost < min_cost:
+                min_cost = cost
+                best_pos = candidate
+
+        return best_pos
     
     def _grid_search_initial_guess_2d(self, residual_func, lower_bounds, upper_bounds, step=0.5):
         x_vals = np.arange(lower_bounds[0], upper_bounds[0] + step, step)
