@@ -68,7 +68,9 @@ class LocalizationService:
         x, y, info = self.multilat_calc.calculate_position_2d(
             tdoas, 
             doa_azimuth_deg=azimuth,
-            quality_weights=quality
+            doa_weight=2.0,
+            quality_weights=quality,
+            enforce_inside=True
         )
         
         mic_distances = self._compute_mic_distances(x, y)
@@ -77,8 +79,8 @@ class LocalizationService:
         distance_from_center = np.sqrt((x - array_center[0])**2 + (y - array_center[1])**2)
         
         return {
-            "tdoas": tdoas.tolist(),
-            "correlation_quality": quality,
+            "tdoas": [float(t) for t in tdoas],
+            "correlation_quality": [float(q) for q in quality],
             "azimuth": float(azimuth),
             "elevation": float(elevation),
             "position_x": float(x),
@@ -86,7 +88,7 @@ class LocalizationService:
             "distance": float(distance_from_center),
             "mic_distances": mic_distances,
             "optimization_info": {
-                "success": info["success"],
+                "success": bool(info["success"]),
                 "cost": float(info["cost"]),
             }
         }

@@ -1,8 +1,8 @@
 import { Crosshair, Compass, Ruler, Radio, Locate } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import MicrophoneIcon from './test';
 
-const API_HOST = '172.20.10.4';
+const API_HOST = '172.20.10.12';
 const API_PORT = '8000';
 const WS_URL = `ws://${API_HOST}:${API_PORT}/ws`;
 const API_URL = `http://${API_HOST}:${API_PORT}`;
@@ -27,10 +27,13 @@ export default function MapView() {
   const [localization, setLocalization] = useState<LocalizationData | null>(null);
   const [isLocalizing, setIsLocalizing] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
+  const freezeLabelRef = useRef(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   useEffect(() => {
     let ws: WebSocket | null = null;
     let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+    let clearLocTimeout: ReturnType<typeof setTimeout> | null = null;
 
     const connect = () => {
       ws = new WebSocket(WS_URL);
@@ -45,8 +48,15 @@ export default function MapView() {
         console.log("WS message:", data);
         
         if (data.type === "classification") {
-          setLabel(data.label);
+          if (!freezeLabelRef.current) {
+            setLabel(data.label);
+          }
         } else if (data.type === "localization_start") {
+          if (clearLocTimeout) {
+            clearTimeout(clearLocTimeout);
+            clearLocTimeout = null;
+          }
+          freezeLabelRef.current = true;
           setIsLocalizing(true);
           if (data.manual) {
             setLabel("listening");
@@ -54,6 +64,10 @@ export default function MapView() {
             setLabel("drone");
           }
         } else if (data.type === "localization") {
+          if (clearLocTimeout) {
+            clearTimeout(clearLocTimeout);
+            clearLocTimeout = null;
+          }
           setLocalization({
             azimuth: data.azimuth,
             distance: data.distance,
@@ -63,7 +77,15 @@ export default function MapView() {
           });
         } else if (data.type === "localization_end") {
           setIsLocalizing(false);
-          setLabel("unknown");
+          if (clearLocTimeout) {
+            clearTimeout(clearLocTimeout);
+          }
+          clearLocTimeout = setTimeout(() => {
+            freezeLabelRef.current = false;
+            setLocalization(null);
+            setLabel("unknown");
+            clearLocTimeout = null;
+          }, 5000);
         } else if (data.type === "localization_error") {
           console.error("Localization error:", data.error);
         }
@@ -89,13 +111,43 @@ export default function MapView() {
   }, []);
 
   const handleTriggerLocalization = async () => {
-    try {
-      await fetch(`${API_URL}/api/trigger-localization`, {
-        method: "POST",
-      });
-    } catch (err) {
-      console.error("Failed to trigger localization:", err);
+    if (isLocalizing || countdown !== null) {
+      return;
     }
+
+    // Immediately ask backend to pause the RNN classification loop
+    fetch(`${API_URL}/api/pause-classification`, { method: "POST" }).catch(() => {});
+
+    freezeLabelRef.current = true;
+    setLabel("listening");
+    setCountdown(3);
+
+    let remaining = 3;
+
+    const tick = () => {
+      remaining -= 1;
+      if (remaining > 0) {
+        setCountdown(remaining);
+        setTimeout(tick, 1000);
+      } else {
+        setCountdown(0);
+        (async () => {
+          try {
+            await fetch(`${API_URL}/api/trigger-localization`, {
+              method: "POST",
+            });
+          } catch (err) {
+            console.error("Failed to trigger localization:", err);
+          } finally {
+            setTimeout(() => {
+              setCountdown(null);
+            }, 1000);
+          }
+        })();
+      }
+    };
+
+    setTimeout(tick, 1000);
   };
 
   return (
@@ -120,7 +172,7 @@ export default function MapView() {
           <DirectionBox azimuth={localization?.azimuth ?? null} />
           <DistanceBox distance={localization?.distance ?? null} />
           <MultilaterationBox micDistances={localization?.mic_distances ?? null} />
-          <TriggerButton onClick={handleTriggerLocalization} isLocalizing={isLocalizing} />
+          <TriggerButton onClick={handleTriggerLocalization} isLocalizing={isLocalizing} countdown={countdown} />
         </div>
         
         <div className="flex-1 flex items-center justify-center">
@@ -251,11 +303,20 @@ function MultilaterationBox({ micDistances }: { micDistances: MicDistances | nul
   );
 }
 
-function TriggerButton({ onClick, isLocalizing }: { onClick: () => void; isLocalizing: boolean }) {
+function TriggerButton({ onClick, isLocalizing, countdown }: { onClick: () => void; isLocalizing: boolean; countdown: number | null }) {
+  const getLabel = () => {
+    if (isLocalizing) return "Localizing...";
+    if (countdown !== null) {
+      if (countdown > 0) return `Listening in ${countdown}...`;
+      return "GO!";
+    }
+    return "Locate Sound";
+  };
+
   return (
     <button
       onClick={onClick}
-      disabled={isLocalizing}
+      disabled={isLocalizing || countdown !== null}
       className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
         isLocalizing
           ? "bg-amber-600/30 text-amber-400 cursor-not-allowed border border-amber-600/50"
@@ -263,7 +324,7 @@ function TriggerButton({ onClick, isLocalizing }: { onClick: () => void; isLocal
       }`}
     >
       <Locate className="w-4 h-4" />
-      {isLocalizing ? "Localizing..." : "Locate Sound"}
+      {getLabel()}
     </button>
   );
 }

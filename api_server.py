@@ -46,12 +46,20 @@ async def ws_endpoint(ws: WebSocket):
         print(f"WebSocket error: {e}")
     finally:
         print("WebSocket client disconnected")
-        await ws.close()
+        try:
+            await ws.close()
+        except RuntimeError:
+            pass
 
 @app.post("/api/trigger-localization")
 async def trigger_localization():
     manager.trigger_localization()
     return {"status": "ok", "message": "Localization triggered"}
+
+@app.post("/api/pause-classification")
+async def pause_classification():
+    manager.pause_for_manual()
+    return {"status": "ok", "message": "Classification pause requested"}
 
 @app.get("/api/status")
 async def get_status():

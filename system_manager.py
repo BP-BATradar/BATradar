@@ -45,13 +45,22 @@ class SystemManager:
         self.localization_service = LocalizationService()
         
         self._last_localization_time: float = 0
-        self._manual_trigger = threading.Event()
+        self._manual_trigger = threading.Event()  # legacy, kept for compatibility
         self._is_manual_localization = False
+        self._pause_for_manual = threading.Event()
+        self._pending_manual_localization = threading.Event()
+        self._localization_requested = False
+        self._paused_for_manual = False
         
         self._latest_localization: Optional[Dict] = None
         
     def trigger_localization(self):
-        self._manual_trigger.set()
+        # Called at GO (after countdown) to start a one-shot manual localization
+        self._pending_manual_localization.set()
+
+    def pause_for_manual(self):
+        # Called on button click to stop the classification loop as soon as possible
+        self._pause_for_manual.set()
         
     
     def _run_classification(self):
@@ -64,14 +73,12 @@ class SystemManager:
             if self.stop_event.is_set():
                 break
             
-            if self._manual_trigger.is_set():
-                self._manual_trigger.clear()
-                self._is_manual_localization = True
-                self.message_queue.put({
-                    "type": "localization_start",
-                    "manual": True
-                })
-                break
+            # Pause requested for manual localization: stop classification but do NOT
+            # start localization yet. We wait for the GO signal.
+            if self._pause_for_manual.is_set():
+                self._pause_for_manual.clear()
+                self._paused_for_manual = True
+                return
             
             event = {
                 "type": "classification",
@@ -85,13 +92,14 @@ class SystemManager:
                 now = time.time()
                 if now - self._last_localization_time >= self.cooldown_seconds:
                     self._is_manual_localization = False
+                    self._localization_requested = True
                     self.message_queue.put({
                         "type": "localization_start",
                         "manual": False
                     })
                     break
     
-    def _run_localization_sequence(self):
+    def _run_localization_sequence(self, one_shot: bool = False):
         self.state = SystemState.LOCALIZING
         self._last_localization_time = time.time()
         
@@ -104,7 +112,9 @@ class SystemManager:
             })
             return
         
-        for cycle in range(self.localization_cycles):
+        cycles = 1 if one_shot else self.localization_cycles
+        
+        for cycle in range(cycles):
             if self.stop_event.is_set():
                 break
                 
@@ -151,36 +161,75 @@ class SystemManager:
     
     def _main_loop(self):
         while not self.stop_event.is_set():
-            try:
-                self._run_classification()
-            except Exception as e:
-                print(f"Classification error: {e}")
-                self.message_queue.put({
-                    "type": "classification",
-                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "prob_drone": 0.0,
-                    "label": "unknown",
-                })
-                time.sleep(2.0)
-                continue
+            # Run classification only if we are not in a manual pause state
+            if not self._paused_for_manual:
+                try:
+                    self._run_classification()
+                except Exception as e:
+                    print(f"Classification error: {e}")
+                    self.message_queue.put({
+                        "type": "classification",
+                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "prob_drone": 0.0,
+                        "label": "unknown",
+                    })
+                    time.sleep(2.0)
+                    continue
             
             if self.stop_event.is_set():
                 break
-            
-            try:
-                self._run_localization_sequence()
-            except Exception as e:
-                print(f"Localization sequence error: {e}")
+
+            # Manual one-shot localization requested (GO pressed)
+            if self._pending_manual_localization.is_set():
+                self._pending_manual_localization.clear()
+                self._is_manual_localization = True
                 self.message_queue.put({
-                    "type": "localization_error",
-                    "error": str(e)
+                    "type": "localization_start",
+                    "manual": True
                 })
-                self.message_queue.put({
-                    "type": "localization_end",
-                    "manual": self._is_manual_localization
-                })
+                try:
+                    self._run_localization_sequence(one_shot=True)
+                except Exception as e:
+                    print(f"Localization sequence error (manual): {e}")
+                    self.message_queue.put({
+                        "type": "localization_error",
+                        "error": str(e)
+                    })
+                    self.message_queue.put({
+                        "type": "localization_end",
+                        "manual": True
+                    })
+                finally:
+                    # After manual localization, resume normal monitoring
+                    self._paused_for_manual = False
+                    self._is_manual_localization = False
+                    self.state = SystemState.MONITORING
+                continue
+
+            # Automatic localization requested from classification
+            if self._localization_requested:
+                self._localization_requested = False
                 self._is_manual_localization = False
-                self.state = SystemState.MONITORING
+                try:
+                    self._run_localization_sequence(one_shot=False)
+                except Exception as e:
+                    print(f"Localization sequence error (auto): {e}")
+                    self.message_queue.put({
+                        "type": "localization_error",
+                        "error": str(e)
+                    })
+                    self.message_queue.put({
+                        "type": "localization_end",
+                        "manual": False
+                    })
+                    self._is_manual_localization = False
+                    self.state = SystemState.MONITORING
+                continue
+
+            # No localization requested; if paused for manual, just wait
+            if self._paused_for_manual:
+                time.sleep(0.1)
+                continue
     
     def start(self):
         self.stop_event.clear()
