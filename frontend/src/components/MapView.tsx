@@ -1,9 +1,9 @@
 import { Crosshair, Compass, Ruler, Radio, Locate } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import MicrophoneIcon from './test';
 
-const API_HOST = import.meta.env.VITE_API_HOST || window.location.hostname;
-const API_PORT = import.meta.env.VITE_API_PORT || '8000';
+const API_HOST = '172.20.10.12';
+const API_PORT = '8000';
 const WS_URL = `ws://${API_HOST}:${API_PORT}/ws`;
 const API_URL = `http://${API_HOST}:${API_PORT}`;
 
@@ -26,53 +26,128 @@ export default function MapView() {
   const [label, setLabel] = useState<DisplayLabel>("unknown");
   const [localization, setLocalization] = useState<LocalizationData | null>(null);
   const [isLocalizing, setIsLocalizing] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
+  const freezeLabelRef = useRef(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   useEffect(() => {
-    const ws = new WebSocket(WS_URL);
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+    let clearLocTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      
-      if (data.type === "classification") {
-        if (!isLocalizing) {
-          setLabel(data.label);
+    const connect = () => {
+      ws = new WebSocket(WS_URL);
+
+      ws.onopen = () => {
+        console.log("WebSocket connected");
+        setWsConnected(true);
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        console.log("WS message:", data);
+        
+        if (data.type === "classification") {
+          if (!freezeLabelRef.current) {
+            setLabel(data.label);
+          }
+        } else if (data.type === "localization_start") {
+          if (clearLocTimeout) {
+            clearTimeout(clearLocTimeout);
+            clearLocTimeout = null;
+          }
+          freezeLabelRef.current = true;
+          setIsLocalizing(true);
+          if (data.manual) {
+            setLabel("listening");
+          } else {
+            setLabel("drone");
+          }
+        } else if (data.type === "localization") {
+          if (clearLocTimeout) {
+            clearTimeout(clearLocTimeout);
+            clearLocTimeout = null;
+          }
+          setLocalization({
+            azimuth: data.azimuth,
+            distance: data.distance,
+            position_x: data.position_x,
+            position_y: data.position_y,
+            mic_distances: data.mic_distances,
+          });
+        } else if (data.type === "localization_end") {
+          setIsLocalizing(false);
+          if (clearLocTimeout) {
+            clearTimeout(clearLocTimeout);
+          }
+          clearLocTimeout = setTimeout(() => {
+            freezeLabelRef.current = false;
+            setLocalization(null);
+            setLabel("unknown");
+            clearLocTimeout = null;
+          }, 5000);
+        } else if (data.type === "localization_error") {
+          console.error("Localization error:", data.error);
         }
-      } else if (data.type === "localization_start") {
-        setIsLocalizing(true);
-        if (data.manual) {
-          setLabel("listening");
-        }
-      } else if (data.type === "localization") {
-        setLocalization({
-          azimuth: data.azimuth,
-          distance: data.distance,
-          position_x: data.position_x,
-          position_y: data.position_y,
-          mic_distances: data.mic_distances,
-        });
-      } else if (data.type === "localization_end") {
-        setIsLocalizing(false);
-        if (data.manual) {
-          setLabel("unknown");
-        }
+      };
+
+      ws.onerror = (err) => {
+        console.error("WebSocket error:", err);
+      };
+
+      ws.onclose = () => {
+        console.log("WebSocket closed, reconnecting in 2s...");
+        setWsConnected(false);
+        reconnectTimeout = setTimeout(connect, 2000);
+      };
+    };
+
+    connect();
+
+    return () => {
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (ws) ws.close();
+    };
+  }, []);
+
+  const handleTriggerLocalization = async () => {
+    if (isLocalizing || countdown !== null) {
+      return;
+    }
+
+    // Immediately ask backend to pause the RNN classification loop
+    fetch(`${API_URL}/api/pause-classification`, { method: "POST" }).catch(() => {});
+
+    freezeLabelRef.current = true;
+    setLabel("listening");
+    setCountdown(3);
+
+    let remaining = 3;
+
+    const tick = () => {
+      remaining -= 1;
+      if (remaining > 0) {
+        setCountdown(remaining);
+        setTimeout(tick, 1000);
+      } else {
+        setCountdown(0);
+        (async () => {
+          try {
+            await fetch(`${API_URL}/api/trigger-localization`, {
+              method: "POST",
+            });
+          } catch (err) {
+            console.error("Failed to trigger localization:", err);
+          } finally {
+            setTimeout(() => {
+              setCountdown(null);
+            }, 1000);
+          }
+        })();
       }
     };
 
-    ws.onerror = (err) => {
-      console.error("WebSocket error:", err);
-    };
-
-    return () => ws.close();
-  }, [isLocalizing]);
-
-  const handleTriggerLocalization = async () => {
-    try {
-      await fetch(`${API_URL}/api/trigger-localization`, {
-        method: "POST",
-      });
-    } catch (err) {
-      console.error("Failed to trigger localization:", err);
-    }
+    setTimeout(tick, 1000);
   };
 
   return (
@@ -93,11 +168,11 @@ export default function MapView() {
       
       <div className="flex h-full">
         <div className="w-[280px] flex-shrink-0 p-4 space-y-3 z-10">
-          <DroneBox label={label} isLocalizing={isLocalizing} />
+          <DroneBox label={label} isLocalizing={isLocalizing} wsConnected={wsConnected} />
           <DirectionBox azimuth={localization?.azimuth ?? null} />
           <DistanceBox distance={localization?.distance ?? null} />
           <MultilaterationBox micDistances={localization?.mic_distances ?? null} />
-          <TriggerButton onClick={handleTriggerLocalization} isLocalizing={isLocalizing} />
+          <TriggerButton onClick={handleTriggerLocalization} isLocalizing={isLocalizing} countdown={countdown} />
         </div>
         
         <div className="flex-1 flex items-center justify-center">
@@ -108,7 +183,7 @@ export default function MapView() {
   );
 }
 
-function DroneBox({ label, isLocalizing }: { label: DisplayLabel; isLocalizing: boolean }) {
+function DroneBox({ label, isLocalizing, wsConnected }: { label: DisplayLabel; isLocalizing: boolean; wsConnected: boolean }) {
   const getDisplayText = () => {
     if (label === "listening") return "Manual Listening";
     if (label === "drone") return "Drone";
@@ -126,12 +201,19 @@ function DroneBox({ label, isLocalizing }: { label: DisplayLabel; isLocalizing: 
       <div className="flex items-center gap-2 mb-3">
         <Radio className={`w-4 h-4 ${isLocalizing ? "text-amber-400" : "text-emerald-400"}`} />
         <span className="text-sm font-medium text-gray-300">DRONE</span>
+        <div className={`w-2 h-2 rounded-full ml-auto ${wsConnected ? "bg-emerald-400" : "bg-red-400"}`} title={wsConnected ? `Connected to ${API_HOST}` : `Disconnected from ${API_HOST}`} />
       </div>
       <div className="space-y-1 text-xs font-mono">
         <div className="flex justify-between">
           <span className="text-gray-500">LABEL</span>
           <span className={getTextColor()}>
             {getDisplayText()}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500">SERVER</span>
+          <span className={wsConnected ? "text-emerald-400" : "text-red-400"}>
+            {API_HOST}:{API_PORT}
           </span>
         </div>
       </div>
@@ -221,11 +303,20 @@ function MultilaterationBox({ micDistances }: { micDistances: MicDistances | nul
   );
 }
 
-function TriggerButton({ onClick, isLocalizing }: { onClick: () => void; isLocalizing: boolean }) {
+function TriggerButton({ onClick, isLocalizing, countdown }: { onClick: () => void; isLocalizing: boolean; countdown: number | null }) {
+  const getLabel = () => {
+    if (isLocalizing) return "Localizing...";
+    if (countdown !== null) {
+      if (countdown > 0) return `Listening in ${countdown}...`;
+      return "GO!";
+    }
+    return "Locate Sound";
+  };
+
   return (
     <button
       onClick={onClick}
-      disabled={isLocalizing}
+      disabled={isLocalizing || countdown !== null}
       className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
         isLocalizing
           ? "bg-amber-600/30 text-amber-400 cursor-not-allowed border border-amber-600/50"
@@ -233,7 +324,7 @@ function TriggerButton({ onClick, isLocalizing }: { onClick: () => void; isLocal
       }`}
     >
       <Locate className="w-4 h-4" />
-      {isLocalizing ? "Localizing..." : "Locate Sound"}
+      {getLabel()}
     </button>
   );
 }
@@ -245,10 +336,10 @@ interface MicrophonesProps {
 
 export function Microphones({ label, localization }: MicrophonesProps) {
   const microphones = [
-    { id: "M1", x: 0, y: 0 },
-    { id: "M2", x: 0, y: 3 },
-    { id: "M3", x: 3, y: 0 },
-    { id: "M4", x: 3, y: 3 },
+    { id: "M1", x: 0, y: 0, key: "bottom_left" },
+    { id: "M2", x: 0, y: 3, key: "bottom_right" },
+    { id: "M3", x: 3, y: 0, key: "top_left" },
+    { id: "M4", x: 3, y: 3, key: "top_right" },
   ];
 
   const scale = 180;
@@ -256,29 +347,31 @@ export function Microphones({ label, localization }: MicrophonesProps) {
   const offset = dotSize / 2;
   const lineStyle = "absolute border-gray-400 border-dashed";
   const arraySize = 3.0;
-   const widthValue = `${arraySize * scale}px`
+  const widthValue = `${arraySize * scale}px`;
+  
+  const centerX = (arraySize / 2) * scale + offset;
+  const centerY = (arraySize / 2) * scale + offset;
   
   let targetDotPosition: { left: number; top: number } | null = null;
   if (localization) {
     const posX = Math.max(0, Math.min(arraySize, localization.position_x));
     const posY = Math.max(0, Math.min(arraySize, localization.position_y));
     targetDotPosition = {
-      left: posX * scale,
-      top: (arraySize - posY) * scale,
+      left: posX * scale + offset,
+      top: (arraySize - posY) * scale + offset,
     };
   }
 
   const isActive = label === "drone" || label === "listening";
 
-
   return (
     <div className={`relative w-[580px] h-[580px] ${isActive ? "animate-pulse" : ""}`}>
       {/* top dimension label */}
       <div
-        className="absolute top-1/2 transform -translate-y-1/2 text-xs text-gray-300"
+        className="absolute text-xs text-gray-300"
         style={{
           left: `${microphones[0].x * scale + offset + 260}px`,
-          top: `${microphones[0].y * scale + offset - 10}px`
+          top: `${microphones[0].y * scale + offset - 25}px`
         }}
       >
         {arraySize}m
@@ -291,13 +384,10 @@ export function Microphones({ label, localization }: MicrophonesProps) {
           top: `${microphones[0].y * scale + offset}px`,
           width: widthValue,
         }}
-      >
-      </div>
+      />
       {/* bottom */}
       <div
-
         className={`${lineStyle} border-t-2 ${isActive ? "bg-emerald-600" : "bg-gray-600"}`}
-
         style={{
           left: `${microphones[1].x * scale + offset}px`,
           top: `${microphones[1].y * scale + offset}px`,
@@ -306,9 +396,7 @@ export function Microphones({ label, localization }: MicrophonesProps) {
       />
       {/* left */}
       <div
-
         className={`${lineStyle} border-l-2 ${isActive ? "bg-emerald-600" : "bg-gray-600"}`}
-
         style={{
           left: `${microphones[0].x * scale + offset}px`,
           top: `${microphones[0].y * scale + offset}px`,
@@ -317,7 +405,7 @@ export function Microphones({ label, localization }: MicrophonesProps) {
       />
       {/* right dimension label */}
       <div
-        className="absolute top-1/2 transform -translate-y-1/2 text-xs text-gray-300"
+        className="absolute text-xs text-gray-300"
         style={{
           left: `${microphones[2].x * scale + offset + 10}px`, 
           top: `${microphones[2].y * scale + offset + 280}px`,
@@ -327,9 +415,7 @@ export function Microphones({ label, localization }: MicrophonesProps) {
       </div>
       {/* right */}
       <div
-
         className={`${lineStyle} border-l-2 ${isActive ? "bg-emerald-600" : "bg-gray-600"}`}
-
         style={{
           left: `${microphones[2].x * scale + offset}px`,
           top: `${microphones[2].y * scale + offset}px`,
@@ -337,13 +423,62 @@ export function Microphones({ label, localization }: MicrophonesProps) {
         }}
       />
 
+      {/* Center dot */}
+      <div
+        className="absolute w-2 h-2 rounded-full bg-gray-500 opacity-60"
+        style={{
+          left: `${centerX - 4}px`,
+          top: `${centerY - 4}px`,
+        }}
+      />
+
+      {/* Distance lines from target to each mic */}
+      {targetDotPosition && localization && (
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          style={{ width: '580px', height: '580px' }}
+        >
+          {microphones.map((mic) => {
+            const micX = mic.x * scale + offset;
+            const micY = mic.y * scale + offset;
+            const dist = localization.mic_distances[mic.key as keyof typeof localization.mic_distances];
+            const midX = (targetDotPosition!.left + micX) / 2;
+            const midY = (targetDotPosition!.top + micY) / 2;
+            
+            return (
+              <g key={mic.id}>
+                <line
+                  x1={targetDotPosition!.left}
+                  y1={targetDotPosition!.top}
+                  x2={micX}
+                  y2={micY}
+                  stroke="#6b7280"
+                  strokeWidth="1"
+                  strokeDasharray="4 4"
+                  opacity="0.6"
+                />
+                <text
+                  x={midX}
+                  y={midY - 6}
+                  fill="#9ca3af"
+                  fontSize="10"
+                  textAnchor="middle"
+                  className="font-mono"
+                >
+                  {dist.toFixed(2)}m
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      )}
+
       {microphones.map((mic) => (
         <div
           key={mic.id}
           className={`absolute w-6 h-6 rounded-full border-2 border-gray-400 flex items-center justify-center text-xs font-bold ${
             isActive ? "bg-emerald-600" : "bg-gray-600"
           }`}
-
           style={{
             left: `${mic.x * scale}px`,
             top: `${mic.y * scale}px`,
@@ -357,8 +492,8 @@ export function Microphones({ label, localization }: MicrophonesProps) {
         <div
           className="absolute w-4 h-4 rounded-full bg-lime-400 animate-ping-slow"
           style={{
-            left: `${targetDotPosition.left + offset - 8}px`,
-            top: `${targetDotPosition.top + offset - 8}px`,
+            left: `${targetDotPosition.left - 8}px`,
+            top: `${targetDotPosition.top - 8}px`,
             boxShadow: '0 0 12px 4px rgba(163, 230, 53, 0.6)',
           }}
         />
@@ -367,8 +502,8 @@ export function Microphones({ label, localization }: MicrophonesProps) {
         <div
           className="absolute w-3 h-3 rounded-full bg-lime-300"
           style={{
-            left: `${targetDotPosition.left + offset - 6}px`,
-            top: `${targetDotPosition.top + offset - 6}px`,
+            left: `${targetDotPosition.left - 6}px`,
+            top: `${targetDotPosition.top - 6}px`,
           }}
         />
       )}

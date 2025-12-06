@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.optimize import least_squares, minimize
 from typing import Tuple, Optional, List
-from ..config.config import SPEED_OF_SOUND, REFERENCE_MIC_INDEX
+from config.config import SPEED_OF_SOUND, REFERENCE_MIC_INDEX
 
 
 class MultilaterationCalculator:
@@ -118,9 +118,18 @@ class MultilaterationCalculator:
         if initial_guess is not None:
             initial_guess = np.asarray(initial_guess, dtype=float)
         elif doa_unit_vec is not None:
-            initial_guess = self._initial_guess_from_doa_2d(doa_unit_vec, lower_bounds, upper_bounds)
+            # Use the DOA angle to pick a good starting point along that ray,
+            # but still within the allowed search bounds.
+            initial_guess = self._initial_guess_from_doa_2d(
+                doa_unit_vec,
+                lower_bounds,
+                upper_bounds,
+            )
         else:
-            initial_guess = self._grid_search_initial_guess_2d(residuals, lower_bounds, upper_bounds, step=0.5)
+            # Fall back to a coarse grid search over the array region.
+            initial_guess = self._grid_search_initial_guess_2d(
+                residuals, lower_bounds, upper_bounds, step=0.5
+            )
         
         result = least_squares(
             residuals,

@@ -36,19 +36,30 @@ async def shutdown_event():
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
     await ws.accept()
+    print("WebSocket client connected")
     
     try:
         async for msg in manager.event_stream():
+            print(f"Sending to frontend: {msg['type']}")
             await ws.send_json(msg)
     except Exception as e:
         print(f"WebSocket error: {e}")
     finally:
-        await ws.close()
+        print("WebSocket client disconnected")
+        try:
+            await ws.close()
+        except RuntimeError:
+            pass
 
 @app.post("/api/trigger-localization")
 async def trigger_localization():
     manager.trigger_localization()
     return {"status": "ok", "message": "Localization triggered"}
+
+@app.post("/api/pause-classification")
+async def pause_classification():
+    manager.pause_for_manual()
+    return {"status": "ok", "message": "Classification pause requested"}
 
 @app.get("/api/status")
 async def get_status():

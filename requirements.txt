@@ -6,7 +6,6 @@ soundfile
 joblib
 tqdm
 sounddevice
-tensorflow
 fastapi
 uvicorn[standard]
 websockets
