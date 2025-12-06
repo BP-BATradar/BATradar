@@ -337,8 +337,8 @@ interface MicrophonesProps {
 export function Microphones({ label, localization }: MicrophonesProps) {
   const microphones = [
     { id: "M1", x: 0, y: 0, key: "bottom_left" },
-    { id: "M2", x: 0, y: 3, key: "top_left" },
-    { id: "M3", x: 3, y: 0, key: "bottom_right" },
+    { id: "M2", x: 0, y: 3, key: "bottom_right" },
+    { id: "M3", x: 3, y: 0, key: "top_left" },
     { id: "M4", x: 3, y: 3, key: "top_right" },
   ];
 
